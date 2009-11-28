@@ -34,7 +34,7 @@ class Entry:
         'notes': 'Notes',
         'url': 'URL',
     }
-    def __init__(self, db, name, label, url, acct, pswd, notes, uid=None):
+    def __init__(self, db, name, label, url, acct, pswd, notes, mtime, uid=None):
         if uid is None:
             self.uid = db.gen_uid()
         else:
@@ -45,6 +45,7 @@ class Entry:
         self.acct = acct
         self.pswd = pswd
         self.notes = notes
+        self.mtime = mtime
     def __hash__(self):
         return hash(self.uid)
     def __contains__(self, key):
@@ -75,6 +76,36 @@ class Entry:
     def __repr__(self):
         return '<%s "%s">' % (self.__class__.__name__, self.name)
 
+class Date:
+    fmtpatt = '%Y%d%m.%H%M%S'
+    def __init__(self, datestr):
+        if datestr is None:
+            self.when = self.now()
+        else:
+            self.when = self.parse(datestr)
+    def now():
+        import time
+        return time.gmtime()
+    now = staticmethod(now)
+    def parse(cls, datestr):
+        import time
+        return time.strptime(datestr, cls.fmtpatt)
+    def __trunc__(self):
+        import time
+        return long(time.mktime(self.when))
+    def __long__(self):
+        import time
+        return long(time.mktime(self.when))
+    def __str__(self):
+        import time
+        return time.strftime(self.fmtpatt, self.when)
+    def __repr__(self):
+        import time
+        return '<%s "%s">'% (self.__class__.__name__, time.asctime(self.when))
+    def __cmp__(self, other):
+        import time
+        return -cmp(other, long(self))
+
 class Database:
     Locked = lock.FileLock.Locked
     rec_delim = ('--' * 38)
@@ -104,6 +135,8 @@ class Database:
                 self.flock.unlock()
                 raise
     def _open(self):
+        if not os.path.exists(self.filename):
+            open(self.filename, 'w') # 'touch'
         self.file = gzip.GzipFile(self.filename, "r")
         if self.uid is None:
             # load the uid from the file
@@ -213,7 +246,7 @@ class Database:
         self.dirty = True
 
     def new(self):
-        e = Entry(self, '', '', '', '', '', '', None)
+        e = Entry(self, '', '', '', '', '', '', Date(None), None)
         return e
 
     def reset_uid(self):
@@ -252,6 +285,7 @@ class Database:
             'acct': '',
             'pswd': '',
             'notes': '',
+            'mtime': None,
             'uid': '',
         }
         try:
@@ -265,6 +299,7 @@ class Database:
         e = Entry(self,
             e['name'], e['label'], e['url'], e['acct'], e['pswd'],
             e['notes'].replace('###', '\n'),
+            Date(e['mtime']),
             e['uid']
         )
         return e
@@ -296,6 +331,7 @@ class Database:
         file.write('acct: %s\n' % entry.acct)
         file.write('pswd: %s\n' % entry.pswd)
         file.write('notes: %s\n' % entry.notes.replace('\n', '###'))
+        file.write('mtime: %s\n' % entry.mtime)
         file.write('uid: %s\n' % entry.uid)
         file.write('%s\n' % cls.rec_delim)
     write_entry = classmethod(write_entry)
