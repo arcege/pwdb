@@ -648,8 +648,11 @@ if __name__ == '__main__':
             DB_Filename = val
 
     try:
-        cli = PwdbCmd()
-        cli.cmdloop()
-    except KeyboardInterrupt:
-        print
+        try:
+            cli = PwdbCmd()
+            cli.cmdloop()
+        except KeyboardInterrupt:
+            print
+    finally:
+        os.system('clear')
 
