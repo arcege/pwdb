@@ -197,7 +197,7 @@ class DebugCmd(Cmd):
         uid, mtime = tuple(args)
         if uid[:1] == '#':
             uid = uid[1:]
-        from database import Date
+        from pwdb.database import Date
         try:
             mtime = Date(mtime)
         except ValueError:
@@ -451,6 +451,7 @@ System to view and manupulate passwords and their metadata.'''
                 for arg in args:
                     if entry == str(arg):
                         if self.edit_entry(entry):
+                            entry.mtime = entry.mtime.now()
                             changed = True
             self.db.update(changed)
         finally:
