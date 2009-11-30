@@ -80,13 +80,16 @@ class Date:
     fmtpatt = '%Y%d%m.%H%M%S'
     def __init__(self, datestr):
         if datestr is None:
-            self.when = self.now()
+            self.when = self._now()
         else:
             self.when = self.parse(datestr)
-    def now():
+    def _now():
         import time
         return time.gmtime()
-    now = staticmethod(now)
+    _now = staticmethod(_now)
+    def now(cls):
+        return cls(None)
+    now = classmethod(now)
     def parse(cls, datestr):
         import time
         return time.strptime(datestr, cls.fmtpatt)
