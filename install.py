@@ -1,8 +1,8 @@
 #!/usr/bin/python
 # install.py
 
+import getopt
 import os
-import shutil
 import sys
 
 install_dir = '~'
@@ -13,6 +13,7 @@ Bin_dirs = [
 ]
 Bin_files = [
   ('cli.py', 'pwdb'),
+  ('merge.py', 'pwdb-merge'),
 ]
 
 Lib_dir = [
@@ -41,6 +42,23 @@ def installfile(srcfilename, dstfilename, perm):
     os.chmod(dstfilename, perm)
 
 if __name__ == '__main__':
+    try:
+        opts, args = getopt.getopt(sys.argv[1:], 'd:h', [
+                'directory=',
+                'help',
+            ]
+        )
+    except getopt.error, e:
+        raise SystemExit(e)
+    for opt, val in opts:
+        if opt == '--':
+            break
+        elif opt in ('-d', '--directory'):
+            install_dir = val
+        elif opt in ('-h', '--help'):
+            print sys.argv[0]
+            print '\t-h|--help'
+            print '\t-d <instdir>|--directory=<instdir>'
     install_dir = os.path.expanduser(install_dir)
     mkdir(install_dir)
 
