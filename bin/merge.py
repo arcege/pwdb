@@ -9,13 +9,17 @@ else:
 sys.path.insert(0, libdir)
 import pwdb.database
 
+fmt = '%39.39s'
+fmtstr = '%s %s' % (fmt, fmt)
+#fmtstr = '%39.39s %39.39s'
+
 def show_diff(l, r):
     def dist(l, r):
         if l == r:
-            print l
+            print fmt % str(l)[:39]
         else:
-            print '%39.39s %39.39s' % (str(l)[:39], str(r)[:39])
-    print '%39s %39s' % ('differences: left', 'right')
+            print fmtstr % (str(l)[:39], str(r)[:39])
+    print fmtstr % ('differences: left', 'right')
     dist(l.uid, r.uid)
     dist(l.mtime, r.mtime)
     dist(l.name, r.name)
@@ -27,34 +31,47 @@ def show_diff(l, r):
         print l.notes
     else:
         ln = l.notes.split('\n')
-        rn = r.notes.split('\n')
+        rn = l.notes.split('\n')
         for i in xrange(min(len(ln), len(rn))):
-            print '%39.39s %39.39s' % (ln[i][:39], rn[i][:39])
+            print fmtstr % (ln[i][:39], rn[i][:39])
         if len(ln) > len(rn):
             for i in xrange(len(ln), len(rn)):
-                print '%39.39s %39.39s' % (ln[i][:39], '')
+                print fmtstr % (ln[i][:39], '')
         else:
-            for i in xrange(len(rn), len(ln)):
-                print '%39.39s %39.39s' % ('', rn[i][:39])
+            for i in xrange(len(ln), len(rn)):
+                print fmtstr % ('', rn[i][:39])
 def show_entry(e, caption):
-    print caption
-    print '%39.39s' % e.uid[:39]
-    print '%39.39s' % e.mtime
-    print '%39.39s' % e.name[:39]
-    print '%39.39s' % e.acct[:39]
-    print '%39.39s' % e.pswd[:39]
-    print '%39.39s' % e.url[:39]
-    print '%39.39s' % e.label[:39]
-    print '%39.39s' % e.notes[:39]
+    print fmt % caption
+    print fmt % e.uid[:39]
+    print fmt % e.mtime
+    print fmt % e.name[:39]
+    print fmt % e.acct[:39]
+    print fmt % e.pswd[:39]
+    print fmt % e.url[:39]
+    print fmt % e.label[:39]
+    print fmt % e.notes[:39]
 
 def merge(db, e1, e2):
-    if e1.mtime < e2.mtime:
-        e = Entry(db,
+    if e1.uid != e2.uid:
+        assert e1.name == e2.name, 'names of entries not equal'
+        # better thing to do is create an entry with new UID
+        if e1.mtime < e2.mtime:
+            e = psdb.database.Entry(db,
+                e2.name, e2.label, e2.url, e2.acct, e2.pswd,
+                e2.notes, e2.mtime, None # force new UID
+            )
+        else:
+            e = psdb.database.Entry(db,
+                e1.name, e1.label, e1.url, e1.acct, e1.pswd,
+                e1.notes, e1.mtime, None # force new UID
+            )
+    elif e1.mtime < e2.mtime:
+        e = pwdb.database.Entry(db,
             e2.name, e2.label, e2.url, e2.acct, e2.pswd,
             e2.notes, e2.mtime, e2.uid
         )
     else:
-        e = Entry(db,
+        e = pwdb.database.Entry(db,
             e1.name, e1.label, e1.url, e1.acct, e1.pswd,
             e1.notes, e1.mtime, e1.uid
         )
@@ -62,9 +79,12 @@ def merge(db, e1, e2):
 
 if __name__ == '__main__':
     perform = 'merge'
-    if sys.argv[1] == 'diff':
-        perform = 'diff'
-        del sys.argv[1]
+    try:
+        if sys.argv[1] == 'diff':
+            perform = 'diff'
+            del sys.argv[1]
+    except IndexError:
+        pass
     try:
         leftname = sys.argv[1]
         rightname = sys.argv[2]
@@ -72,53 +92,70 @@ if __name__ == '__main__':
             newname = sys.argv[3]
     except IndexError:
         raise SystemExit('expecting at least three arguments')
-    dbleft  = pwdb.database.Database(leftname)
+    dbleft = pwdb.database.Database(leftname)
     dbright = pwdb.database.Database(rightname)
-    if perform == 'merge':
-        dbnew   = pwdb.database.Database(newname)
 
-    entries = {}
+    left = list(dbleft)
+    right = list(dbright)
+    leftids, rightids = {}, {}
+    leftnames, rightnames = {}, {}
+    for e in left:
+        leftids[e.uid] = e
+        leftnames[e.name] = e
+    for e in right:
+        rightids[e.uid] = e
+        rightnames[e.name] = e
+
+    left.sort()   # sort by uid
+    right.sort()  # sort by uid
+    tomerge = []
+    # check for names before UIDs
+    for lkey, lval in leftnames.items():
+        if rightnames.has_key(lkey):
+            if rightnames[lkey].uid != lval.uid:
+                # same names, different UIDs = possible merge; check data
+                tomerge.append( (False, lval, rightnames[lkey]) )
+                del leftids[lval.uid]
+                del rightids[rightnames[lkey].uid]
+    for lkey, lval in leftids.items():
+        if rightids.has_key(lkey):
+            if rightids[lkey].name != lval.name:
+                # same UIDs, different names = possible merge; check data
+                tomerge.append( (False, lval, rightids[lkey]) )
+            elif rightids[lkey].mtime != lval.mtime:
+                # same UIDs&name, different mtimes = merge
+                tomerge.append( (False, lval, rightids[lkey]) )
+            else:
+                # same UIDs&name&mtime
+                tomerge.append( (True, lval, None) )
+        else:
+            tomerge.append( (False, lval, None) )
+    for rkey, rval in rightids.items():
+        if not leftids.has_key(rkey):
+            tomerge.append( (False, None, rval) )
 
     if perform == 'diff':
-        left = list(dbleft)
-        right = list(dbright)
-        dbleft.close()
-        dbright.close()
-        for e in left:
-            if e in right:
-                p = right.index(e)
-                show_diff(e, right[p])
-                del right[p]
-                left.remove(e)
+        for same, lval, rval in tomerge:
+            if same:
+                pass # ignore entries that are the same
+            elif lval is None:
+                show_entry(rval, caption='only in right')
+            elif rval is None:
+                show_entry(lval, caption='only in left')
             else:
-                show_entry(e, caption='only in left')
-        for e in right:
-            if e in left:
-                p = left.index(e)
-                show_diff(left[p], e)
-                del left[p]
-                right.remove(e)
-            else:
-                show_entry(e, caption='only in right')
+                show_diff(lval, rval)
 
-    if perform == 'merge':
-        for db in (dbleft, dbright):
-            for entry in db:
-                if entries.has_key(entry.uid):
-                    entries[entry.uid].append(entry)
-                else:
-                    entries[entry.uid] = [entry]
-
+    elif perform == 'merge':
+        dbnew = pwdb.database.Database(newname)
         newentries = []
-        dbnew.open()
-        for key in sorted(entries.keys()):
-            e = entries[key]
-            if len(e) == 1:
-                newentries.append(e)
-            elif len(e) > 2:
-                print 'error: more than two entries with #%s' % key
+        for same, lval, rval in tomerge:
+            if same or rval is None:
+                newentries.append( lval )
+            elif lval is None:
+                newentries.append( rval )
             else:
-                newentries.append(dbnew, merge(e[0], e[1]))
+                newentries.append( merge(dbnew, lval, rval) )
+        dbnew.open()
         if dbleft.uid > dbright.uid:
             dbnew.set_uid(dbleft.uid)
         else:
@@ -126,8 +163,7 @@ if __name__ == '__main__':
         dbleft.close()
         dbright.close()
 
-        for entry in newentries:
-            dbnew.append(entry)
+        dbnew.extend(newentries)
         dbnew.update()
         dbnew.close()
 
