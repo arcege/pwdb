@@ -4,10 +4,19 @@ import getopt
 import os
 import sys
 from cmd import Cmd
-from database import Database
+if os.path.exists(os.path.join(os.curdir, 'lib', 'pwdb')):
+    libdir = os.path.join(os.curdir, 'lib')
+elif os.path.exists(os.path.expanduser(os.path.join('~', 'lib'))):
+    libdir = os.path.expanduser(os.path.join('~', 'lib'))
+else:
+    libdir = os.path.normpath(
+        os.path.join(os.path.dirname(sys.argv[0]), os.pardir, 'lib')
+    )
+sys.path.insert(0, libdir)
+from pwdb.database import Database
 
 DB_Filename = os.path.expanduser(os.path.join('~', '.pwdb'))
-DB_Filename = 'passwordy.db'
+#DB_Filename = 'passwordy.db'
 
 __all__ = [
   'PwdbCmd'
