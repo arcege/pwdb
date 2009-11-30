@@ -22,6 +22,20 @@ __all__ = [
   'PwdbCmd'
 ]
 
+class Ed:
+    def __init__(self, lines):
+        from tempfile import mktemp
+        self.filename = mktemp('ed')
+        if lines:
+            self.buffer = lines + '\n'
+        else:
+            self.buffer = ''
+    def run(self):
+        open(self.filename, 'w').write(self.buffer)
+        os.system('ed %s' % self.filename)
+        self.buffer = open(self.filename, 'r').read()
+        return self.buffer.rstrip()
+
 def YorN(prompt, reqresp=True, allowintr=False):
     resp = ''
     import sys, termios
@@ -423,7 +437,8 @@ System to view and manupulate passwords and their metadata.'''
                 pswd = self.gen_password()
             url   = raw_input('URL: ')
             label = raw_input('Labels: ')
-            notes = raw_input('Notes: ')
+            print 'Notes:'
+            notes = Ed('').run()
         except (EOFError, KeyboardInterrupt):
             print
         else:
@@ -553,7 +568,8 @@ System to view and manupulate passwords and their metadata.'''
             pswd  = raw_input('%s: ' % entry.fieldnames['pswd'])
             url   = raw_input('%s: ' % entry.fieldnames['url'])
             label = raw_input('%s: ' % entry.fieldnames['label'])
-            notes = raw_input('%s: ' % entry.fieldnames['notes'])
+            print 'Notes:'
+            notes = Ed(entry.notes).run()
         except (EOFError, KeyboardInterrupt):
             print
             print 'Aborting edit'
@@ -570,7 +586,7 @@ System to view and manupulate passwords and their metadata.'''
                 ('name', new_name), ('acct', new_acct), ('pswd', new_pswd),
                 ('url', new_url), ('label', new_label)):
                 print '%s: ' % entry.fieldnames[name], value
-            print 'notes:\t%s' % new_notes
+            print 'Notes:\t%s' % new_notes
             if YorN('Is this correct?'):
                 entry.name  = new_name
                 entry.acct  = new_acct
