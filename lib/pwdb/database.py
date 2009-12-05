@@ -313,11 +313,14 @@ class Database:
         if not self.dirty and not force:
             return
         tmpfname = '%s.tmp.%d' % (self.filename, os.getpid())
+        # make sure that the creation of the file is owner-readable only
+        oldmask = os.umask(0077)
         file = gzip.GzipFile('w', fileobj=open(tmpfname, 'w'))
         file.write('%s\n' % self.uid)
         for entry in self:
             self.write_entry(file, entry)
         file.close()
+        os.umask(oldmask)
         bakname = '%s.bak' % self.filename
         try:
             os.remove(bakname)
