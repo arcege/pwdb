@@ -508,19 +508,25 @@ System to view and manupulate passwords and their metadata.'''
 
     def do_search(self, argstr):
         try:
-            entries = []
+            import re
+            cmp = re.compile(argstr, re.IGNORECASE)
+        except re.error, e:
+            print str(e)
+            return
+        try:
+            lastentry = None
             self.db.open()
             for entry in self.db:
-                if entry.find(argstr):
-                    entries.append(entry)
+                for key in entry.fieldnames.keys():
+                    val = getattr(entry, key)
+                    if cmp.search(val):
+                        # was this entry's name printed already
+                        if lastentry != entry:
+                            print entry.name
+                            lastentry = entry
+                        print '\t%s: %s' % (entry.fieldnames[key], val)
         finally:
             self.db.close()
-        for entry in entries:
-            print entry.name
-            for key in entry.fieldnames.keys():
-                val = getattr(entry, key)
-                if val.find(argstr) != -1:
-                    print '\t%s: %s' % (entry.fieldnames[key], val)
     def help_search(self):
         print 'search pattern - search for a string'
 
