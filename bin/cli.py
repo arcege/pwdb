@@ -178,7 +178,7 @@ class DebugCmd(Cmd):
         except (EOFError, KeyboardInterrupt):
             print
     def help_list(self):
-        print 'list entries with uids'
+        print 'list - list entries with uids'
     def do_show(self, argstr):
         args = argstr.split()
         try:
@@ -193,7 +193,7 @@ class DebugCmd(Cmd):
         finally:
             self.db.close()
     def help_show(self):
-        print 'display details of an uid or named entry'
+        print 'show #uid|name ... - display details of an uid or named entry'
     def display_entry(self, entry):
         print 'uid: #%s' % entry.uid
         print 'mtime: %s' % entry.mtime
@@ -231,7 +231,7 @@ class DebugCmd(Cmd):
         finally:
             self.db.close()
     def help_mtime(self):
-        print 'set the mtime of an entry'
+        print 'mtime uid mtime - set the mtime of an entry'
 
     def do_EOF(self, argstr):
         print
@@ -239,13 +239,14 @@ class DebugCmd(Cmd):
     def do_return(self, args):
         return True
     def help_return(self, args):
-        return 'Exit the debug section'
+        return 'return - exit the debug section'
     def do_quit(self, args):
         return True
     def help_quit(self):
-        print 'Exit the tag management section'
+        print 'quit - exit the debug section'
 
 class TagCmd(Cmd):
+    """tag management"""
     prompt = 'tag> '
     def __init__(self, db, *args, **kws):
         Cmd.__init__(self, *args, **kws)
@@ -267,7 +268,7 @@ class TagCmd(Cmd):
             tags[p] = '-'
         print '\n'.join(sorted(tags))
     def help_list(self):
-        print 'Display all tags'
+        print 'list - display all tags'
 
     def do_show(self, argstr):
         args = argstr.split()
@@ -285,7 +286,7 @@ class TagCmd(Cmd):
         finally:
             self.db.close()
     def help_show(self):
-        print 'Display list of entries with matching tags'
+        print 'show tag ... - display list of entries with matching tags'
 
     def do_add(self, argstr):
         args = argstr.split()
@@ -307,7 +308,7 @@ class TagCmd(Cmd):
         finally:
             self.db.close()
     def help_add(self):
-        print 'Add tag to given entries'
+        print 'add tag entry... - add tag to given entries'
 
     def do_delete(self, argstr):
         args = argstr.split()
@@ -332,7 +333,7 @@ class TagCmd(Cmd):
         finally:
             self.db.close()
     def help_delete(self):
-        print 'Delete one or more tags from each entry'
+        print 'delete tag ... - delete one or more tags from each entry'
 
     def do_rename(self, argstr):
         args = argstr.split()
@@ -366,7 +367,7 @@ class TagCmd(Cmd):
         finally:
             self.db.close()
     def help_rename(self):
-        print 'Rename a tag in each entry'
+        print 'rename oldtag newtag - rename a tag in each entry'
 
     def do_EOF(self, args):
         print
@@ -374,11 +375,11 @@ class TagCmd(Cmd):
     def do_return(self, args):
         return True
     def help_return(self):
-        print 'Exit the tag management section'
+        print 'return - exit the tag management section'
     def do_quit(self, args):
         return True
     def help_quit(self):
-        print 'Exit the tag management section'
+        print 'quit - exit the tag management section'
 
 class PwdbCmd(Cmd):
     prompt = 'pwdb> '
@@ -405,7 +406,7 @@ System to view and manupulate passwords and their metadata.'''
         except (EOFError, KeyboardInterrupt):
             print
     def help_list(self):
-        print 'Display a list of entries, by name'
+        print 'list [name] - display a list of entries, by name'
 
     def do_show(self, argstr):
         args = argstr.split()
@@ -420,7 +421,7 @@ System to view and manupulate passwords and their metadata.'''
         finally:
             self.db.close()
     def help_show(self):
-        print 'Display the details of one or more entries'
+        print 'show name... - display the details of one or more entries'
 
     def do_new(self, args):
         try:
@@ -454,7 +455,7 @@ System to view and manupulate passwords and their metadata.'''
             self.db.update()
             self.db.close()
     def help_new(self):
-        print 'Enter information for a new entry into the pswd database'
+        print 'new - enter information for a new entry into the pswd database'
 
     def do_edit(self, argstr):
         args = argstr.split()
@@ -472,7 +473,7 @@ System to view and manupulate passwords and their metadata.'''
         finally:
             self.db.close()
     def help_edit(self):
-        print 'Edit an existing entry'
+        print 'edit name - edit an existing entry'
 
     def do_remove(self, argstr):
         args = argstr.split()
@@ -489,7 +490,7 @@ System to view and manupulate passwords and their metadata.'''
         finally:
             self.db.close()
     def help_remove(self):
-        print 'Remove one or more entries'
+        print 'remove name... - remove one or more entries'
 
     def do_find(self, argstr):
         args = argstr.split()
@@ -503,7 +504,7 @@ System to view and manupulate passwords and their metadata.'''
                 if arg in entry:
                     print entry.name
     def help_find(self):
-        print 'Return list of entries with a string'
+        print 'find name... - return list of entries with a string'
 
     def do_search(self, argstr):
         try:
@@ -521,7 +522,7 @@ System to view and manupulate passwords and their metadata.'''
                 if val.find(argstr) != -1:
                     print '\t%s: %s' % (entry.fieldnames[key], val)
     def help_search(self):
-        print 'Search for a string'
+        print 'search pattern - search for a string'
 
     def do_tag(self, argstr):
         args = argstr.split()
@@ -530,8 +531,8 @@ System to view and manupulate passwords and their metadata.'''
             cli.cmdloop()
         else:
             cli.onecmd(argstr)
-    def help_tag(tags):
-        print 'tag management'
+    def help_tag(self):
+        TagCmd(self.db).onecmd('help')
 
     def do_debug(self, argstr):
         cli = DebugCmd(self.db)
@@ -546,10 +547,10 @@ System to view and manupulate passwords and their metadata.'''
     def do_quit(self, args):
         return True
     def help_quit(self):
-        print 'Exit the program'
+        print 'quit - exit the program'
 
     def help_help(self):
-        print 'Show information about the commands available'
+        print 'help - show information about the commands available'
 
     def display_entry(self, entry):
         for field in ('name', 'acct', 'pswd', 'url', 'label'):
