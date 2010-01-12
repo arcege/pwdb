@@ -384,7 +384,7 @@ class TagCmd(Cmd):
 class PwdbCmd(Cmd):
     prompt = 'pwdb> '
     intro = '''Password Database command interpreter
-System to view and manupulate passwords and their metadata.'''
+System to view and manipulate passwords and their metadata.'''
     def __init__(self, *args, **kws):
         Cmd.__init__(self, *args, **kws)
         self.db = Database(DB_Filename)
