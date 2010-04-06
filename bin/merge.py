@@ -79,24 +79,49 @@ def merge(db, e1, e2):
 
 if __name__ == '__main__':
     perform = 'merge'
+    if sys.argv[1] == 'help':
+        print os.path.basename(sys.argv[0]), "left right output"
+        print os.path.basename(sys.argv[0]), "diff left right"
+        print os.path.basename(sys.argv[0]), "dump dbfile"
+        raise SystemExit
     try:
         if sys.argv[1] == 'diff':
             perform = 'diff'
+            del sys.argv[1]
+        elif sys.argv[1] == 'dump':
+            perform = 'dump'
             del sys.argv[1]
     except IndexError:
         pass
     try:
         leftname = sys.argv[1]
-        rightname = sys.argv[2]
-        if perform == 'merge':
-            newname = sys.argv[3]
+        if perform != 'dump':
+            rightname = sys.argv[2]
+            if perform == 'merge':
+                newname = sys.argv[3]
     except IndexError:
         raise SystemExit('expecting at least three arguments')
-    dbleft = pwdb.database.Database(leftname)
-    dbright = pwdb.database.Database(rightname)
+    fleft = open(leftname, 'rb').read(6)
+    if perform != 'dump':
+        fright = open(rightname, 'rb').read(6)
+
+    leftkls  = pwdb.database.Database.check_file_type(leftname)
+    if perform != 'dump':
+        rightkls = pwdb.database.Database.check_file_type(rightname)
+    leftkey = rightkey = None
+    if leftkls.need_key:
+        leftkey  = raw_input('Key for %s: ' % leftname)
+    dbleft = leftkls(leftname, leftkey)
+    if perform != 'dump':
+        if rightkls.need_key:
+            rightkey = raw_input('Key for %s: ' % rightname)
+        dbright = rightkls(rightname, rightkey)
 
     left = list(dbleft)
-    right = list(dbright)
+    if perform != 'dump':
+        right = list(dbright)
+    else:
+        right = list()
     leftids, rightids = {}, {}
     leftnames, rightnames = {}, {}
     for e in left:
@@ -134,7 +159,10 @@ if __name__ == '__main__':
         if not leftids.has_key(rkey):
             tomerge.append( (False, None, rval) )
 
-    if perform == 'diff':
+    if perform == 'dump':
+        for e in dbleft:
+            show_entry(e, caption='-' * 40)
+    elif perform == 'diff':
         for same, lval, rval in tomerge:
             if same:
                 pass # ignore entries that are the same
@@ -146,7 +174,8 @@ if __name__ == '__main__':
                 show_diff(lval, rval)
 
     elif perform == 'merge':
-        dbnew = pwdb.database.Database(newname)
+        newkey = raw_input('New key: ')
+        dbnew = pwdb.database.EncryptDatabase(newname, newkey)
         newentries = []
         for same, lval, rval in tomerge:
             if same or rval is None:

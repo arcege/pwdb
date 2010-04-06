@@ -4,9 +4,14 @@ import lock
 import os
 import gzip
 
+from encrypt.blowfish import Blowfish, Key
+
 __all__ = [
     'Database',
+    'Key',
 ]
+
+DATABASE_FILE_ID = 'PDWD00'
 
 class UIDGenerator:
     def __init__(self, seed):
@@ -139,8 +144,8 @@ class Database:
                 raise
     def _open(self):
         if not os.path.exists(self.filename):
-            open(self.filename, 'w') # 'touch'
-        self.file = gzip.GzipFile(self.filename, "r")
+            self.initialize()
+        self._do_open()
         if self.uid is None:
             # load the uid from the file
             try:
@@ -291,6 +296,7 @@ class Database:
             'mtime': None,
             'uid': '',
         }
+        #print 'line =', repr(line)
         try:
             while line.rstrip() != self.rec_delim:
                 fname, fval = line.split(': ', 1)
@@ -315,7 +321,7 @@ class Database:
         tmpfname = '%s.tmp.%d' % (self.filename, os.getpid())
         # make sure that the creation of the file is owner-readable only
         oldmask = os.umask(0077)
-        file = gzip.GzipFile('w', fileobj=open(tmpfname, 'w'))
+        file = self._get_writer(tmpfname)
         file.write('%s\n' % self.uid)
         for entry in self:
             self.write_entry(file, entry)
@@ -341,4 +347,134 @@ class Database:
         file.write('uid: %s\n' % entry.uid)
         file.write('%s\n' % cls.rec_delim)
     write_entry = classmethod(write_entry)
+
+    def check_file_type(filename):
+        table = {
+            GzipDatabase.startbytes: GzipDatabase,
+            EncryptDatabase.startbytes: EncryptDatabase,
+        }
+        file = open(filename, 'rb')
+        sl = max([len(s) for s in table])
+        s = file.read(sl)
+        for sb in table:
+            if s[:len(sb)] == sb:
+                return table[sb]
+        else:
+            raise ValueError('cannot determine file type')
+    check_file_type = staticmethod(check_file_type)
+
+class GzipDatabase(Database):
+    startbytes = '\037\213'
+    need_key = False
+    def __init__(self, filename, key):
+        Database.__init__(self, filename)
+    def initialize(self):
+        open(self.filename, 'w') # touch
+    def _do_open(self):
+        self.file = gzip.GzipFile(self.filename, "r")
+    def _get_writer(self, filename):
+        return gzip.GzipFile('w', fileobj=open(filename, 'w'))
+
+class EncryptDatabase(Database):
+    startbytes = DATABASE_FILE_ID
+    need_key = True
+    def __init__(self, filename, key):
+        self.key = Key(key)
+        self.encrypter = Blowfish(self.key)
+        Database.__init__(self, filename)
+    def initialize(self):
+        f = Encoder(self.filename, self.encrypter)
+        f.open()
+        f.close()
+    def _do_open(self):
+        self.file = Decoder(self.filename, self.encrypter)
+        self.file.open()
+    def _get_writer(self, filename):
+        file = Encoder(filename, self.encrypter)
+        file.open()
+        return file
+
+class Engine:
+    sentinal = 'ENCODED\n'  # used to determine if the correct key was used
+                            # to decrypt the file
+    def __init__(self, filename, encrypter):
+        self.name = filename
+        self.fp = None
+        self._sfp = None
+        self.mode = None
+        self.encrypter = encrypter
+    def __del__(self):
+        self.close()
+    def __repr__(self):
+        return '<%s "%s">' % (self.__class__.__name__, self.name)
+    def open(self):
+        try:
+            from cStringIO import StringIO
+        except ImportError:
+            from StringIO import StringIO
+        self.fp = StringIO()
+        self._sfp = open(self.name, self._filemode)
+        self.mode = self._filemode.replace("b", "")
+    def close(self):
+        if self.fp:
+            self.fp = None
+            self.mode = None
+        if self._sfp:
+            self._sfp.close()
+            self._sfp = None
+    def seek(self, pos, whence=0):
+        if self.fp:
+            self.fp.seek(0, whence)
+
+class Decoder(Engine):
+    _filemode = 'rb'
+    def seek(self, pos, whence=0):
+        Engine.seek(self, pos, whence)
+        self.read_fileheader()
+    def read_fileheader(self):
+        self._sfp.seek(0)
+        data = self._sfp.read(len(DATABASE_FILE_ID))
+        if data != DATABASE_FILE_ID:
+            raise ValueError('Datafile invalid: not a PWDB version 0.0 file')
+        self._loadcache()
+    def readline(self):
+        return self.fp.readline()
+    def _loadcache(self):
+        bs = self.encrypter.blocksize
+        blk = self._sfp.read(len(self.sentinal))
+        dblk = self.encrypter.decrypt(blk)
+        if dblk != self.sentinal:
+            raise RuntimeError('Data key invalid: could not decrypt file')
+        blk = self._sfp.read(bs)
+        while blk:
+            dblk = self.encrypter.decrypt(blk).rstrip('\0')
+            self.fp.write(dblk)
+            blk = self._sfp.read(bs)
+        self.fp.seek(0)
+
+class Encoder(Engine):
+    _filemode = 'wb'
+    def write(self, msg):
+        self.fp.write(msg)
+    def close(self):
+        if self._sfp and self.fp:
+            self._writebuf()
+            Engine.close(self)
+    def _writebuf(self):
+        self._sfp.seek(0)
+        self._sfp.write(DATABASE_FILE_ID) # app and file version
+        bs = self.encrypter.blocksize
+        self.fp.seek(0)
+        dblk = self.encrypter.encrypt(self.sentinal)
+        self._sfp.write(dblk)
+        blk = self.fp.read(bs)
+        while blk:
+            if len(blk) < bs:
+                s = '\0' * (bs-len(blk))
+                blk += s
+            dblk = self.encrypter.encrypt(blk)
+            self._sfp.write(dblk)
+            blk = self.fp.read(bs)
+        self._sfp.flush()
+
 

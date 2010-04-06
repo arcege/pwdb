@@ -13,7 +13,7 @@ else:
         os.path.join(os.path.dirname(sys.argv[0]), os.pardir, 'lib')
     )
 sys.path.insert(0, libdir)
-from pwdb.database import Database
+from pwdb.database import Database, EncryptDatabase
 
 DB_Filename = os.path.expanduser(os.path.join('~', '.pwdb'))
 #DB_Filename = 'passwordy.db'
@@ -60,6 +60,41 @@ def YorN(prompt, reqresp=True, allowintr=False):
         os.write(outfd, resp)
         os.write(outfd, '\n')
     return resp == 'y'
+
+def get_key(prompt, allowintr=True):
+    resp = ''
+    import sys, termios
+    real_prompt = '%s: ' % prompt
+    infd = sys.stdin.fileno()
+    outfd = sys.stdout.fileno()
+    old = termios.tcgetattr(infd)
+    new = old[:]
+    new[3] &= ~(termios.ECHO|termios.ICANON)
+    try:
+        termios.tcsetattr(infd, termios.TCSAFLUSH, new)
+        os.write(outfd, real_prompt)
+        ch = None
+        while ch != '\n':
+            ch = os.read(infd, 1)
+            if allowintr and ch == '\003': raise KeyboardInterrupt
+            if allowintr and ch == '\004': raise EOFError
+            if ch == '\n': # newline
+                break
+            elif ch == '\177' or ch == '\b': # '^?' or '^H' keys
+                if resp:
+                    resp = resp[:-1]
+                    os.write(outfd, '\b \b')
+            elif ch == '\025': # '^U' key
+                for i in xrange(len(resp)):
+                    os.write(outfd, '\b \b')
+                resp = ''
+            else:
+                resp += ch
+                os.write(outfd, '*')
+    finally:
+        termios.tcsetattr(outfd, termios.TCSADRAIN, old)
+        os.write(outfd, '\n')
+    return resp
 
 class Paginator:
     def __init__(self, lines, input=None, output=None):
@@ -386,8 +421,14 @@ class PwdbCmd(Cmd):
     intro = '''Password Database command interpreter
 System to view and manipulate passwords and their metadata.'''
     def __init__(self, *args, **kws):
+        key = kws['key']
+        del kws['key']
         Cmd.__init__(self, *args, **kws)
-        self.db = Database(DB_Filename)
+        self.key = key
+        #print 'key=', repr(key)
+        kls = Database.check_file_type(DB_Filename)
+        self.db = kls(DB_Filename, self.key)
+        self.db.open() # to force data key decryption check
     def emptyline(self):
         pass
 
@@ -654,10 +695,22 @@ if __name__ == '__main__':
         elif opt in ('-f', '--file'):
             DB_Filename = val
 
+    kls = Database.check_file_type(DB_Filename)
+    if kls == EncryptDatabase:
+        try:
+            key = get_key('Key')
+        except (KeyboardInterrupt, EOFError):
+            #print
+            raise SystemExit
+    else:
+        key = None
+
     try:
         try:
-            cli = PwdbCmd()
+            cli = PwdbCmd(key=key)
             cli.cmdloop()
+        except RuntimeError, msg:
+            raise SystemExit(msg)
         except KeyboardInterrupt:
             print
     finally:
