@@ -8,6 +8,7 @@ else:
     libdir = os.path.expanduser(os.path.join('~', 'lib'))
 sys.path.insert(0, libdir)
 import pwdb.database
+from pwdb.console import get_key
 
 fmt = '%39.39s'
 fmtstr = '%s %s' % (fmt, fmt)
@@ -77,105 +78,126 @@ def merge(db, e1, e2):
         )
     return e
 
-if __name__ == '__main__':
-    perform = 'merge'
-    if sys.argv[1] == 'help':
-        print os.path.basename(sys.argv[0]), "left right output"
-        print os.path.basename(sys.argv[0]), "diff left right"
-        print os.path.basename(sys.argv[0]), "dump dbfile"
-        raise SystemExit
-    try:
-        if sys.argv[1] == 'diff':
-            perform = 'diff'
-            del sys.argv[1]
-        elif sys.argv[1] == 'dump':
-            perform = 'dump'
-            del sys.argv[1]
-    except IndexError:
-        pass
-    try:
-        leftname = sys.argv[1]
-        if perform != 'dump':
-            rightname = sys.argv[2]
-            if perform == 'merge':
-                newname = sys.argv[3]
-    except IndexError:
-        raise SystemExit('expecting at least three arguments')
-    fleft = open(leftname, 'rb').read(6)
-    if perform != 'dump':
-        fright = open(rightname, 'rb').read(6)
+def normuserpath(filename):
+    return os.path.normpath(os.path.expanduser(filename))
 
-    leftkls  = pwdb.database.Database.check_file_type(leftname)
-    if perform != 'dump':
-        rightkls = pwdb.database.Database.check_file_type(rightname)
-    leftkey = rightkey = None
-    if leftkls.need_key:
-        leftkey  = raw_input('Key for %s: ' % leftname)
-    dbleft = leftkls(leftname, leftkey)
-    if perform != 'dump':
-        if rightkls.need_key:
-            rightkey = raw_input('Key for %s: ' % rightname)
-        dbright = rightkls(rightname, rightkey)
-
-    left = list(dbleft)
-    if perform != 'dump':
-        right = list(dbright)
-    else:
-        right = list()
-    leftids, rightids = {}, {}
-    leftnames, rightnames = {}, {}
-    for e in left:
-        leftids[e.uid] = e
-        leftnames[e.name] = e
-    for e in right:
-        rightids[e.uid] = e
-        rightnames[e.name] = e
-
-    left.sort()   # sort by uid
-    right.sort()  # sort by uid
-    tomerge = []
-    # check for names before UIDs
-    for lkey, lval in leftnames.items():
-        if rightnames.has_key(lkey):
-            if rightnames[lkey].uid != lval.uid:
-                # same names, different UIDs = possible merge; check data
-                tomerge.append( (False, lval, rightnames[lkey]) )
-                del leftids[lval.uid]
-                del rightids[rightnames[lkey].uid]
-    for lkey, lval in leftids.items():
-        if rightids.has_key(lkey):
-            if rightids[lkey].name != lval.name:
-                # same UIDs, different names = possible merge; check data
-                tomerge.append( (False, lval, rightids[lkey]) )
-            elif rightids[lkey].mtime != lval.mtime:
-                # same UIDs&name, different mtimes = merge
-                tomerge.append( (False, lval, rightids[lkey]) )
+class App:
+    def __init__(self, args):
+        self.args = args
+        self.oper = 'merge'
+        self.getargs()
+        if self.oper == 'dump':
+            db = self.retrieve_db(self.dbfile)
+            self.task_dump(db)
+            db.close()
+        elif self.oper == 'diff':
+            dbleft = self.retrieve_db(self.leftfname)
+            dbright = self.retrieve_db(self.rightfname)
+            tomerge = self.analyze_databases(dbleft, dbright)
+            dbleft.close()
+            dbright.close()
+            self.task_diff(tomerge)
+        elif self.oper == 'merge':
+            dbleft = self.retrieve_db(self.leftfname)
+            dbright = self.retrieve_db(self.rightfname)
+            tomerge = self.analyze_databases(dbleft, dbright)
+            self.task_merge(dbleft, dbright, tomerge)
+            dbleft.close()
+            dbright.close()
+    def getargs(self):
+        try:
+            if len(self.args) < 1:
+                self.help()
+                raise SystemExit('Too few arguments')
+            if len(self.args) == 1:
+                self.oper = 'dump'
+                self.dbfile = normuserpath(self.args[0])
+            elif len(self.args) == 2:
+                self.oper = 'diff'
+                self.leftfname = normuserpath(self.args[0])
+                self.rightfname = normuserpath(self.args[1])
+            elif len(self.args) == 3:
+                self.oper = 'merge'
+                self.leftfname = normuserpath(self.args[0])
+                self.rightfname = normuserpath(self.args[1])
+                self.outfname = normuserpath(self.args[2])
             else:
-                # same UIDs&name&mtime
-                tomerge.append( (True, lval, None) )
-        else:
-            tomerge.append( (False, lval, None) )
-    for rkey, rval in rightids.items():
-        if not leftids.has_key(rkey):
-            tomerge.append( (False, None, rval) )
-
-    if perform == 'dump':
-        for e in dbleft:
+                self.help()
+                raise SystemExit('Too many arguments')
+        except IndexError:
+            self.help()
+            raise SystemExit('Expected arguments')
+        if self.args[0] in ('-h', '--help', 'help'):
+            self.help()
+            raise SystemExit
+    def help(self):
+        progname = os.path.basename(sys.argv[0])
+        print progname, 'dbfile - dump dbfile'
+        print progname, 'left right - show diff between left&right'
+        print progname, 'left right output - merge left&right to output'
+    def retrieve_db(self, filename):
+        key = None
+        kls = pwdb.database.Database.check_file_type(filename)
+        if kls.need_key:
+            key = get_key('Key for %s' % filename)
+        db = kls(filename, key)
+        return db
+    def analyze_databases(self, dbleft, dbright):
+        tomerge = []
+        left = list(dbleft)
+        right = list(dbright)
+        leftids, rightids = {}, {}
+        leftnames, rightnames = {}, {}
+        for e in left:
+            leftids[e.uid] = e
+            leftnames[e.name] = e
+        for e in right:
+            rightids[e.uid] = e
+            rightnames[e.name] = e
+        left.sort()   # sort by uid
+        right.sort()  # sort by uid
+        tomerge = []
+        # check for names before UIDs
+        for lkey, lval in leftnames.items():
+            if rightnames.has_key(lkey):
+                if rightnames[lkey].uid != lval.uid:
+                    # same name, different UIDs = possible merge; check data
+                    tomerge.append( (False, lval, rightnames[lkey] ) )
+                    del leftids[lval.uid]
+                    del rightids[rightnames[lkey].uid]
+        for lkey, lval in leftids.items():
+            if rightids.has_key(lkey):
+                if rightids[lkey].name != lval.name:
+                    # same UIDs, different names = possible merge; check data
+                    tomerge.append( (False, lval, rightids[lkey]) )
+                elif rightids[lkey].mtime != lval.mtime:
+                    # same UIDs&name, different mtimes = merge
+                    tomerge.append( (False, lval, rightids[lval]) )
+                else:
+                    # same UIDs&name&mtime
+                    tomerge.append( (True, lval, None) )
+            else:
+                tomerge.append( (False, lval, None) )
+        for rkey, rval in rightids.items():
+            if not leftids.has_key(rkey):
+                tomerge.append( (False, None, rval) )
+        return tomerge
+    def task_dump(self, db):
+        for e in db:
             show_entry(e, caption='-' * 40)
-    elif perform == 'diff':
+    def task_diff(self, tomerge):
         for same, lval, rval in tomerge:
             if same:
-                pass # ignore entries that are the same
+                pass  # ignore entries that are the same
             elif lval is None:
                 show_entry(rval, caption='only in right')
             elif rval is None:
                 show_entry(lval, caption='only in left')
             else:
                 show_diff(lval, rval)
-
-    elif perform == 'merge':
-        newkey = raw_input('New key: ')
-        dbnew = pwdb.database.EncryptDatabase(newname, newkey)
+    def task_merge(self, dbleft, dbright, tomerge):
+        newkey = get_key(self.outfname)
+        dbnew = pwdb.database.EncryptDatabase(self.outfname, newkey)
         newentries = []
         for same, lval, rval in tomerge:
             if same or rval is None:
@@ -189,10 +211,13 @@ if __name__ == '__main__':
             dbnew.set_uid(dbleft.uid)
         else:
             dbnew.set_uid(dbright.uid)
-        dbleft.close()
-        dbright.close()
-
         dbnew.extend(newentries)
         dbnew.update()
         dbnew.close()
+
+if __name__ == '__main__':
+    try:
+        App(sys.argv[1:])
+    except RuntimeError, msg:
+        raise SystemExit(msg)
 
