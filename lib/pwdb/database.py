@@ -356,6 +356,8 @@ class Database:
         file = open(filename, 'rb')
         sl = max([len(s) for s in table])
         s = file.read(sl)
+        if not s: # empty file
+            return GzipDatabase
         for sb in table:
             if s[:len(sb)] == sb:
                 return table[sb]
