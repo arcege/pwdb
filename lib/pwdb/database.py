@@ -13,22 +13,14 @@ __all__ = [
 
 DATABASE_FILE_ID = 'PDWD00'
 
-class UIDGenerator:
-    def __init__(self, seed):
-        self.seed = long(seed or 0)
-    def next(self):
-        self.seed = self.seed + 1
-        return str(self.seed)
-    def __str__(self):
-        return str(self.seed)
-    def __trunc__(self):
-        return self.seed
-    def __long__(self):
-        return self.seed
+class UID(long):
+    def __new__(cls, val):
+        obj = super(UID, cls).__new__(cls, val or 0)
+        return obj
     def __repr__(self):
-        return '<%s %s>' % (self.__class__.__name__, self.seed)
-    def __cmp__(self, other):
-        return -cmp(other, self.seed)
+        return '<%s %d>' % (self.__class__.__name__, self)
+    def next(self):
+        return str(self + 1)
 
 class Entry:
     fieldnames = {
@@ -39,11 +31,12 @@ class Entry:
         'notes': 'Notes',
         'url': 'URL',
     }
-    def __init__(self, db, name, label, url, acct, pswd, notes, mtime, uid=None):
+    def __init__(self, db, name, label, url, acct, pswd,
+                       notes, mtime, uid=None):
         if uid is None:
             self.uid = db.gen_uid()
         else:
-            self.uid = uid
+            self.uid = UID(uid)
         self.name = name
         self.label = label
         self.url = url
@@ -261,11 +254,11 @@ class Database:
         if not self.file:
             raise RuntimeError('database not opened')
         self.file.seek(0)
-        self.uid = UIDGenerator(self.file.readline().strip())
+        self.uid = UID(self.file.readline().strip())
     def set_uid(self, value):
         if not self.file:
             raise RuntimeError('database not opened')
-        self.uid = UIDGenerator(value)
+        self.uid = UID(value)
     def gen_uid(self):
         self.open()
         uid = self.uid.next()
@@ -322,7 +315,7 @@ class Database:
         # make sure that the creation of the file is owner-readable only
         oldmask = os.umask(0077)
         file = self._get_writer(tmpfname)
-        file.write('%s\n' % self.uid)
+        file.write('%ld\n' % self.uid)
         for entry in self:
             self.write_entry(file, entry)
         file.close()
@@ -344,7 +337,7 @@ class Database:
         file.write('pswd: %s\n' % entry.pswd)
         file.write('notes: %s\n' % entry.notes.replace('\n', '###'))
         file.write('mtime: %s\n' % entry.mtime)
-        file.write('uid: %s\n' % entry.uid)
+        file.write('uid: %ld\n' % entry.uid)
         file.write('%s\n' % cls.rec_delim)
     write_entry = classmethod(write_entry)
 

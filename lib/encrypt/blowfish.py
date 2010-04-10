@@ -14,12 +14,9 @@ class Key(str):
     size = 56
     def __new__(cls, keystring):
         if isinstance(keystring, Key):
-            keystr = keystring.keystr
-            md5obj = keystring.md5obj
             key    = str(keystring)
         else:
-            keystr = keystring
-            md5obj = md5(str(keystr))
+            md5obj = md5(str(keystring))
             root = md5obj.hexdigest()
             dig = root
             n, r = divmod(len(dig), cls.size)
@@ -31,8 +28,6 @@ class Key(str):
             assert len(dig) == cls.size, "Could not generate correct key size"
             key = dig
         obj = super(Key, cls).__new__(cls, key)
-        obj.keystr = keystr
-        obj.md5obj = md5obj
         return obj
     def __repr__(self):
         return '<%s "%s">' % (self.__class__.__name__, self)

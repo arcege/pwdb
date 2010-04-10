@@ -18,6 +18,7 @@ Bin_files = [
 
 Lib_dir = [
   os.path.join('lib', 'pwdb'),
+  os.path.join('lib', 'encrypt'),
 ]
 Lib_files = [
 ]
