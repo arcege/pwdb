@@ -13,7 +13,7 @@ else:
         os.path.join(os.path.dirname(sys.argv[0]), os.pardir, 'lib')
     )
 sys.path.insert(0, libdir)
-from pwdb.database import Database, EncryptDatabase
+from pwdb.database import Database, EncryptDatabase, Key
 from pwdb.console import Ed, get_key, Paginator, YorN
 
 DB_Filename = os.path.expanduser(os.path.join('~', '.pwdb'))
@@ -540,7 +540,7 @@ if __name__ == '__main__':
     kls = Database.check_file_type(DB_Filename)
     if kls == EncryptDatabase:
         try:
-            key = get_key('Key')
+            key = Key(get_key('Key'))
         except (KeyboardInterrupt, EOFError):
             #print
             raise SystemExit

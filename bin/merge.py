@@ -139,7 +139,7 @@ class App:
         key = None
         kls = pwdb.database.Database.check_file_type(filename)
         if kls.need_key:
-            key = get_key('Key for %s' % filename)
+            key = pwdb.database.Key(get_key('Key for %s' % filename))
         db = kls(filename, key)
         return db
     def analyze_databases(self, dbleft, dbright):
