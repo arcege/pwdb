@@ -513,6 +513,13 @@ System to view and manipulate passwords and their metadata.'''
                 break
         return password
 
+def real_main(key):
+    PwdbCmd(key=key).cmdloop()
+
+def profile_main(key):
+    global Profile_fname
+    profile.runctx("real_main(key)", globals(), locals(), Profile_fname)
+
 if __name__ == '__main__':
     try:
         opts, args = getopt.getopt(sys.argv[1:], 'f:h',
@@ -540,10 +547,24 @@ if __name__ == '__main__':
     else:
         key = None
 
+    if os.environ.has_key('PROFILING'):
+        if os.environ['PROFILING']:
+            Profile_fname = os.environ['PROFILING']
+        else:
+            Profile_fname = None
+        profiling = True
+        try:
+            import cProfile as profile
+        except ImportError:
+            import profile
+        mainfunc = profile_main
+    else:
+        profiling = False
+        mainfunc = real_main
+
     try:
         try:
-            cli = PwdbCmd(key=key)
-            cli.cmdloop()
+            mainfunc(key)
         except RuntimeError, msg:
             raise SystemExit(msg)
         except KeyboardInterrupt:

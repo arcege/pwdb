@@ -215,9 +215,31 @@ class App:
         dbnew.update()
         dbnew.close()
 
+def real_main(args):
+    App(args)
+
+def profile_main(args):
+    global Profile_fname
+    profile.runctx("real_main(args)", globals(), locals(), Profile_fname)
+
 if __name__ == '__main__':
+    if os.environ.has_key('PROFILING'):
+        if os.environ['PROFILING']:
+            Profile_fname = os.environ['PROFILING']
+        else:
+            Profile_fname = None
+        profiling = True
+        try:
+            import cProfile as profile
+        except ImportError:
+            import profile
+        mainfunc = profile_main
+    else:
+        profiling = False
+        mainfunc = real_main
+
     try:
-        App(sys.argv[1:])
+        mainfunc(sys.argv[1:])
     except RuntimeError, msg:
         raise SystemExit(msg)
 
