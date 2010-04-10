@@ -1,0 +1,39 @@
+.\"manpage for the pwdb command written by Michael P. Reilly
+.\"Copyright 2010 Michael P. Reilly All rights reserved
+.TH pwdb 1 April 10, 2010
+.SH NAME
+pwdb \(em personal password management database
+.SH SYNOPSIS
+.B pwdb
+.SH DESCRIPTION
+This manual page describes the
+.B pwdb
+password management program.  A secure application to manage a user's
+passwords and other secure information (typically related to the Internet)
+was needed.  Most applications were either based on the Web or Microsoft.
+A UNIX/Linux version was needed.
+.SH COMMANDS
+When operated from the console, the program acts as a command interpreter.
+.SS Basic commands
+.SS Tag management
+Tags group entries with commonality for the user's convenience.  Multiple
+tags can be assigned to a single entry.
+.SS Debug
+.SH ENCRYPTION KEY
+The database is encrypted with a single key.  The user master key is not
+stored, but an MD5 representation is used as the internal key to encrypt/
+decrypt the file.  Since neither the user master key or internal key are
+stored, the user must track this user master key separately.
+.SH FILES
+.TP 11em
+~/.pwdb \(em the encrypted password database file
+.TP 11em
+~/.pwdb.bak \(em previous instance of the .pwdb database file
+.TP 11em
+~/.pwdb.lck \(em lock file to prevent overwrite by another program
+.SH NOTES
+The encryption algorithm is an implementation of the Blowfish encryption
+method.
+.SH BUGS
+.SH SEE ALSO
+.BR pwdb-merge (1)
