@@ -172,7 +172,7 @@ class App:
                     tomerge.append( (False, lval, rightids[lkey]) )
                 elif rightids[lkey].mtime != lval.mtime:
                     # same UIDs&name, different mtimes = merge
-                    tomerge.append( (False, lval, rightids[lval]) )
+                    tomerge.append( (False, lval, rightids[lkey]) )
                 else:
                     # same UIDs&name&mtime
                     tomerge.append( (True, lval, None) )
