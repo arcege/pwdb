@@ -4,6 +4,8 @@ import os
 import sys
 import termios
 
+__version = '$Id$'
+
 __all__ = [
     'Ed',
     'get_key',

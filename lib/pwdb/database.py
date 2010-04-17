@@ -6,6 +6,8 @@ import gzip
 
 from encrypt.blowfish import Blowfish, Key
 
+__version = '$Id'
+
 __all__ = [
     'Database',
     'Key',

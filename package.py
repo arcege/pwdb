@@ -5,6 +5,8 @@ import os
 import sys
 import tarfile
 
+__version = '$Id$'
+
 PackageName = 'pwdb.tgz'
 
 Dirs = ('bin', 'lib')

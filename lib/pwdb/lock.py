@@ -2,6 +2,8 @@
 
 import os
 
+__version = '$Id'
+
 __all__ = [
   'FileLock',
 ]

@@ -10,6 +10,8 @@ else:
 sys.path.insert(0, libdir)
 import pwdb.database
 
+__version = '$Id$'
+
 def parse_data(field):
     p = field.find(': ')
     if p != -1:

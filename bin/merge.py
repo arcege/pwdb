@@ -10,6 +10,8 @@ sys.path.insert(0, libdir)
 import pwdb.database
 from pwdb.console import get_key
 
+__version = '$Id$'
+
 fmt = '%39.39s'
 fmtstr = '%s %s' % (fmt, fmt)
 #fmtstr = '%39.39s %39.39s'

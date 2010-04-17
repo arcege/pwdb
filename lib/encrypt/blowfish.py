@@ -5,6 +5,8 @@ try:
 except ImportError:
     import md5.new as md5
 
+__version = '$Id$'
+
 __all__ = [
     'Blowfish',
     'Key',

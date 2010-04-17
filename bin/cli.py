@@ -16,6 +16,8 @@ sys.path.insert(0, libdir)
 from pwdb.database import Database, EncryptDatabase, Key
 from pwdb.console import Ed, get_key, Paginator, YorN
 
+__version = '$Id$'
+
 DB_Filename = os.path.expanduser(os.path.join('~', '.pwdb'))
 #DB_Filename = 'passwordy.db'
 
