@@ -24,6 +24,7 @@ class Ed:
         open(self.filename, 'w').write(self.buffer)
         os.system('ed %s' % self.filename)
         self.buffer = open(self.filename, 'r').read()
+        os.remove(self.filename)
         return self.buffer.rstrip()
 
 def get_key(prompt, allowintr=True, usestdout=False):
