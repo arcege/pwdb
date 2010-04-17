@@ -565,6 +565,8 @@ if __name__ == '__main__':
     try:
         try:
             mainfunc(key)
+        except ValueError, msg:
+            raise SystemExit(msg)
         except RuntimeError, msg:
             raise SystemExit(msg)
         except KeyboardInterrupt:

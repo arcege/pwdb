@@ -297,7 +297,7 @@ class Database:
                 line = self.file.readline()
                 counts['lines'] += 1
         except ValueError:
-            raise AttributeError(count, 'invalid data entry')
+            raise AttributeError(counts, 'invalid data entry')
         e = Entry(self,
             e['name'], e['label'], e['url'], e['acct'], e['pswd'],
             e['notes'].replace('###', '\n'),
