@@ -20,7 +20,7 @@ class UID(long):
     def __repr__(self):
         return '<%s %d>' % (self.__class__.__name__, self)
     def next(self):
-        return str(self + 1)
+        return self.__class__(self + 1)
 
 class Entry:
     fieldnames = {
