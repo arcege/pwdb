@@ -240,6 +240,8 @@ if __name__ == '__main__':
 
     try:
         mainfunc(sys.argv[1:])
+    except ValueError, msg:
+        raise SystemExit(msg)
     except RuntimeError, msg:
         raise SystemExit(msg)
 
