@@ -77,7 +77,7 @@ class Entry:
         return '<%s "%s">' % (self.__class__.__name__, self.name)
 
 class Date:
-    fmtpatt = '%Y%d%m.%H%M%S'
+    fmtpatt = '%Y%m%d.%H%M%S'
     def __init__(self, datestr):
         if datestr is None:
             self.when = self._now()

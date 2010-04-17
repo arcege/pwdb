@@ -45,7 +45,7 @@ def show_diff(l, r):
                 print fmtstr % ('', rn[i][:39])
 def show_entry(e, caption):
     print fmt % caption
-    print fmt % e.uid[:39]
+    print fmt % str(e.uid)[:39]
     print fmt % e.mtime
     print fmt % e.name[:39]
     print fmt % e.acct[:39]
