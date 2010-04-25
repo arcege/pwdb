@@ -134,7 +134,7 @@ if __name__ == '__main__':
 
     if os.path.exists(PackageName):
         os.remove(PackageName)
-    outfile = tarfile.open(PackageName, 'w:gz')
+    outfile = tarfile.Tarfile(PackageName, 'w:gz')
     for file in files:
         outfile.add(os.path.join(dstdir, file), file)
     outfile.close()
