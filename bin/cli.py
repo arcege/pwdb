@@ -25,6 +25,22 @@ __all__ = [
   'PwdbCmd'
 ]
 
+class Colors:
+    map = {
+        'black': 30,
+        'red': 31,
+        'green': 32,
+        'yellow': 33,
+        'blue': 34,
+        'magenta': 35,
+        'cyan': 36,
+        'white': 37,
+        'bold': 1,
+    }
+    def show(cls, color, *text):
+        return '\033[%dm%s\033[0m' % (cls.map[color], ' '.join(text))
+    show = classmethod(show)
+
 class DebugCmd(Cmd):
     prompt = 'debug> '
     def __init__(self, db, *args, **kws):
@@ -67,18 +83,18 @@ class DebugCmd(Cmd):
     def help_show(self):
         print 'show #uid|name ... - display details of an uid or named entry'
     def display_entry(self, entry):
-        print 'uid: #%s' % entry.uid
-        print 'mtime: %s' % entry.mtime
+        print Colors.show('yellow', 'uid: #%s' % entry.uid)
+        print Colors.show('yellow', 'mtime: %s' % entry.mtime)
         for field in ('name', 'acct', 'pswd', 'url', 'label'):
             val = getattr(entry, field)
-            print '%s: %s' % (entry.fieldnames[field], val)
-        print '%s:\t%s' % (
+            print Colors.show('yellow', '%s: %s' % (entry.fieldnames[field], val))
+        print Colors.show('yellow', '%s:\t%s' % (
             entry.fieldnames['notes'], entry.notes.replace('\n', '\n\t')
-        )
+        ))
     def do_mtime(self, argstr):
         args = argstr.split()
         if len(args) != 2:
-            print 'mtime requires to arguments: uid mtime'
+            print Colors.show('red', 'mtime requires to arguments: uid mtime')
             return False
         uid, mtime = tuple(args)
         if uid[:1] == '#':
@@ -87,7 +103,7 @@ class DebugCmd(Cmd):
         try:
             mtime = Date(mtime)
         except ValueError:
-            print 'mtime should be YYYYDDMM.HHMMSS format'
+            print Colors.show('red', 'mtime should be YYYYDDMM.HHMMSS format')
             return False
         try:
             self.db.open()
@@ -97,7 +113,7 @@ class DebugCmd(Cmd):
                     entry = e
                     break
             else:
-                print 'uid not found'
+                print Colors.show('red', 'uid not found')
             entry.mtime = mtime
             self.db.update(True)
         finally:
@@ -210,7 +226,7 @@ class TagCmd(Cmd):
     def do_rename(self, argstr):
         args = argstr.split()
         if len(args) != 2:
-            print 'tag rename requires two arguments'
+            print Colors.show('red', 'tag rename requires two arguments')
             return
         oldtag, newtag = args
         if oldtag == '-':
@@ -295,7 +311,7 @@ System to view and manipulate passwords and their metadata.'''
                 if e:
                     self.display_entry(e)
                 else:
-                    print repr(name), 'not found'
+                    print Colors.show('red', repr(name), 'not found')
         finally:
             self.db.close()
     def help_show(self):
@@ -306,7 +322,9 @@ System to view and manipulate passwords and their metadata.'''
             while True:
                 name  = raw_input('Entry Name: ')
                 if ' ' in name:
-                    print 'Error: spaces not allowed in entry names'
+                    print Colors.show('red',
+                        'Error: spaces not allowed in entry names'
+                    )
                 else:
                     break
             acct  = raw_input('Account Name: ')
@@ -363,7 +381,7 @@ System to view and manipulate passwords and their metadata.'''
                     if YorN('Remove %s' % entry.name):
                         del self.db[entry]
                 else:
-                    print arg, 'not found'
+                    print Colors.show('red', arg, 'not found')
             self.db.update()
         finally:
             self.db.close()
@@ -389,7 +407,7 @@ System to view and manipulate passwords and their metadata.'''
             import re
             cmp = re.compile(argstr, re.IGNORECASE)
         except re.error, e:
-            print str(e)
+            print Colors.show('red', str(e))
             return
         try:
             lastentry = None
@@ -457,7 +475,7 @@ System to view and manipulate passwords and their metadata.'''
             notes = Ed(entry.notes).run()
         except (EOFError, KeyboardInterrupt):
             print
-            print 'Aborting edit'
+            print Colors.show('red', 'Aborting edit')
             return False
         else:
             new_name  = name  or entry.name
@@ -490,7 +508,7 @@ System to view and manipulate passwords and their metadata.'''
             length = raw_input('Length? [10] ')
             try:
                 if length != '' and int(length) <= 6:
-                    print 'must be greater than 6 characters'
+                    print Colors.show('red', 'must be greater than 6 characters')
                 else:
                     done = True
             except ValueError:
@@ -507,7 +525,7 @@ System to view and manipulate passwords and their metadata.'''
             line = f.readline()
             rc = f.close()
             if rc:
-                print 'Error generating new password'
+                print Colors.show('red', 'Error generating new password')
                 raise KeyboardInterrupt  # caught in the caller
             (strength, password) = line.rstrip().split('\t', 1)
             print line.rstrip()
