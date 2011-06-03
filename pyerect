@@ -1,0 +1,46 @@
+#!/usr/bin/python
+# Copyright @ 2011 Michael P. Reilly. All rights reserved.
+# pyerect
+#
+
+from pyerector import *
+from os.path import join
+
+PackageName = 'pwdb.tgz'
+
+Clean.files = (
+    PackageName,
+    join('lib', '*', '*.pyc'),
+)
+
+class Files_utd(Uptodate):
+    sources = (
+        join('bin', 'cli.py'),
+        join('bin', 'merge.py'),
+        join('lib', 'encrypt', '*.py'),
+        join('lib', 'pwdb', '*.py'),
+    )
+    destinations = (PackageName,)
+
+class Tarfile_t(Tar):
+    name = PackageName
+    files = (
+        join('install.py'),
+        join('bin', 'cli.py'),
+        join('bin', 'merge.py'),
+        join('lib', 'encrypt', '__init__.py'),
+        join('lib', 'encrypt', 'blowfish.py'),
+        join('lib', 'pwdb', '__init__.py'),
+        join('lib', 'pwdb', 'console.py'),
+        join('lib', 'pwdb', 'database.py'),
+        join('lib', 'pwdb', 'lock.py'),
+    )
+class Tarfile(Target):
+    uptodates = ('Files_utd',)
+    tasks = ('Tarfile_t',)
+
+Dist.dependencies = ('Tarfile',)
+
+if __name__ == '__main__':
+    pymain()
+
