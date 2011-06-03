@@ -8,21 +8,21 @@ else:
     libdir = os.path.expanduser(os.path.join('~', 'lib'))
 sys.path.insert(0, libdir)
 import pwdb.database
-from pwdb.console import get_key
+from pwdb.console import Console
 
 __version = '$Id$'
 
-fmt = '%39.39s'
-fmtstr = '%s %s' % (fmt, fmt)
+fmt = '%39.39s\n'
+fmtstr = '%s %s\n' % (fmt, fmt)
 #fmtstr = '%39.39s %39.39s'
 
 def show_diff(l, r):
     def dist(l, r):
         if l == r:
-            print(fmt % str(l)[:39])
+            console.write(fmt % str(l)[:39])
         else:
-            print(fmtstr % (str(l)[:39], str(r)[:39]))
-    print(fmtstr % ('differences: left', 'right'))
+            console.write(fmtstr % (str(l)[:39], str(r)[:39]))
+    console.write(fmtstr % ('differences: left', 'right'))
     dist(l.uid, r.uid)
     dist(l.mtime, r.mtime)
     dist(l.name, r.name)
@@ -31,28 +31,28 @@ def show_diff(l, r):
     dist(l.url, r.url)
     dist(l.label, r.label)
     if l.notes == r.notes:
-        print(l.notes)
+        console.write(l.notes + '\n')
     else:
         ln = l.notes.split('\n')
         rn = l.notes.split('\n')
         for i in xrange(min(len(ln), len(rn))):
-            print(fmtstr % (ln[i][:39], rn[i][:39]))
+            console.write(fmtstr % (ln[i][:39], rn[i][:39]))
         if len(ln) > len(rn):
             for i in xrange(len(ln), len(rn)):
-                print(fmtstr % (ln[i][:39], ''))
+                console.write(fmtstr % (ln[i][:39], ''))
         else:
             for i in xrange(len(ln), len(rn)):
-                print(fmtstr % ('', rn[i][:39]))
+                console.write(fmtstr % ('', rn[i][:39]))
 def show_entry(e, caption):
-    print(fmt % caption)
-    print(fmt % str(e.uid)[:39])
-    print(fmt % e.mtime)
-    print(fmt % e.name[:39])
-    print(fmt % e.acct[:39])
-    print(fmt % e.pswd[:39])
-    print(fmt % e.url[:39])
-    print(fmt % e.label[:39])
-    print(fmt % e.notes[:39])
+    console.write(fmt % caption)
+    console.write(fmt % str(e.uid)[:39])
+    console.write(fmt % e.mtime)
+    console.write(fmt % e.name[:39])
+    console.write(fmt % e.acct[:39])
+    console.write(fmt % e.pswd[:39])
+    console.write(fmt % e.url[:39])
+    console.write(fmt % e.label[:39])
+    console.write(fmt % e.notes[:39])
 
 def merge(db, e1, e2):
     if e1.uid != e2.uid:
@@ -134,14 +134,14 @@ class App:
             raise SystemExit
     def help(self):
         progname = os.path.basename(sys.argv[0])
-        print(progname, 'dbfile - dump dbfile')
-        print(progname, 'left right - show diff between left&right')
-        print(progname, 'left right output - merge left&right to output')
+        console.write(progname, 'dbfile - dump dbfile\n')
+        console.write(progname, 'left right - show diff between left&right\n')
+        console.write(progname, 'left right output - merge left&right to output\n')
     def retrieve_db(self, filename):
         key = None
         kls = pwdb.database.Database.check_file_type(filename)
         if kls.need_key:
-            key = pwdb.database.Key(get_key('Key for %s' % filename))
+            key = pwdb.database.Key(console.get_key('Key for %s' % filename))
         db = kls(filename, key)
         return db
     def analyze_databases(self, dbleft, dbright):
@@ -224,7 +224,11 @@ def profile_main(args):
     global Profile_fname
     profile.runctx("real_main(args)", globals(), locals(), Profile_fname)
 
+console = None
+
 if __name__ == '__main__':
+    console = Console()
+
     if os.environ.has_key('PROFILING'):
         if os.environ['PROFILING']:
             Profile_fname = os.environ['PROFILING']
