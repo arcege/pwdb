@@ -22,6 +22,8 @@ class FileLock:
             self.state = 'unlocked'
     def __nonzero__(self):
         return os.path.exists(self.lckname)
+    def __bool__(self):
+        return os.path.exists(self.lckname)
     def lock(self):
         if self:
             raise self.Locked(self.name)
@@ -80,10 +82,10 @@ class TestHarness:
         if os.path.exists(lock02.tmpname):
             failures.append('lock02: tempfile still exists')
         if failures:
-            print 'failure'
-            print '\n'.join(failures)
+            print('failure')
+            print('\n'.join(failures))
         else:
-            print 'success'
+            print('success')
 
 if __name__ == '__main__':
     TestHarness().run()

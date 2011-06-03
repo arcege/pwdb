@@ -19,10 +19,10 @@ fmtstr = '%s %s' % (fmt, fmt)
 def show_diff(l, r):
     def dist(l, r):
         if l == r:
-            print fmt % str(l)[:39]
+            print(fmt % str(l)[:39])
         else:
-            print fmtstr % (str(l)[:39], str(r)[:39])
-    print fmtstr % ('differences: left', 'right')
+            print(fmtstr % (str(l)[:39], str(r)[:39]))
+    print(fmtstr % ('differences: left', 'right'))
     dist(l.uid, r.uid)
     dist(l.mtime, r.mtime)
     dist(l.name, r.name)
@@ -31,28 +31,28 @@ def show_diff(l, r):
     dist(l.url, r.url)
     dist(l.label, r.label)
     if l.notes == r.notes:
-        print l.notes
+        print(l.notes)
     else:
         ln = l.notes.split('\n')
         rn = l.notes.split('\n')
         for i in xrange(min(len(ln), len(rn))):
-            print fmtstr % (ln[i][:39], rn[i][:39])
+            print(fmtstr % (ln[i][:39], rn[i][:39]))
         if len(ln) > len(rn):
             for i in xrange(len(ln), len(rn)):
-                print fmtstr % (ln[i][:39], '')
+                print(fmtstr % (ln[i][:39], ''))
         else:
             for i in xrange(len(ln), len(rn)):
-                print fmtstr % ('', rn[i][:39])
+                print(fmtstr % ('', rn[i][:39]))
 def show_entry(e, caption):
-    print fmt % caption
-    print fmt % str(e.uid)[:39]
-    print fmt % e.mtime
-    print fmt % e.name[:39]
-    print fmt % e.acct[:39]
-    print fmt % e.pswd[:39]
-    print fmt % e.url[:39]
-    print fmt % e.label[:39]
-    print fmt % e.notes[:39]
+    print(fmt % caption)
+    print(fmt % str(e.uid)[:39])
+    print(fmt % e.mtime)
+    print(fmt % e.name[:39])
+    print(fmt % e.acct[:39])
+    print(fmt % e.pswd[:39])
+    print(fmt % e.url[:39])
+    print(fmt % e.label[:39])
+    print(fmt % e.notes[:39])
 
 def merge(db, e1, e2):
     if e1.uid != e2.uid:
@@ -134,9 +134,9 @@ class App:
             raise SystemExit
     def help(self):
         progname = os.path.basename(sys.argv[0])
-        print progname, 'dbfile - dump dbfile'
-        print progname, 'left right - show diff between left&right'
-        print progname, 'left right output - merge left&right to output'
+        print(progname, 'dbfile - dump dbfile')
+        print(progname, 'left right - show diff between left&right')
+        print(progname, 'left right output - merge left&right to output')
     def retrieve_db(self, filename):
         key = None
         kls = pwdb.database.Database.check_file_type(filename)
@@ -160,15 +160,15 @@ class App:
         right.sort()  # sort by uid
         tomerge = []
         # check for names before UIDs
-        for lkey, lval in leftnames.items():
-            if rightnames.has_key(lkey):
+        for lkey, lval in list(leftnames.items()):
+            if lkey in rightnames:
                 if rightnames[lkey].uid != lval.uid:
                     # same name, different UIDs = possible merge; check data
                     tomerge.append( (False, lval, rightnames[lkey] ) )
                     del leftids[lval.uid]
                     del rightids[rightnames[lkey].uid]
-        for lkey, lval in leftids.items():
-            if rightids.has_key(lkey):
+        for lkey, lval in list(leftids.items()):
+            if lkey in rightids:
                 if rightids[lkey].name != lval.name:
                     # same UIDs, different names = possible merge; check data
                     tomerge.append( (False, lval, rightids[lkey]) )
@@ -180,7 +180,7 @@ class App:
                     tomerge.append( (True, lval, None) )
             else:
                 tomerge.append( (False, lval, None) )
-        for rkey, rval in rightids.items():
+        for rkey, rval in list(rightids.items()):
             if not leftids.has_key(rkey):
                 tomerge.append( (False, None, rval) )
         return tomerge
@@ -242,8 +242,10 @@ if __name__ == '__main__':
 
     try:
         mainfunc(sys.argv[1:])
-    except ValueError, msg:
-        raise SystemExit(msg)
-    except RuntimeError, msg:
-        raise SystemExit(msg)
+    except ValueError:
+        et, ev, es = sys.exc_info()
+        raise SystemExit(ev)
+    except RuntimeError:
+        et, ev, es = sys.exc_info()
+        raise SystemExit(ev)
 

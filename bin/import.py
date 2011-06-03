@@ -40,7 +40,7 @@ if __name__ == '__main__':
     data = data.replace('\r\n', '\r')
     rec_delim = '\r' + ('-' * 62) + '\r'
     records = data.split(rec_delim)
-    print '#%d records' % len(records)
+    print('#%d records' % len(records))
     if records[0].startswith('Export Date: '):
         del records[0]
     db = pwdb.database.Database(dbfname)
@@ -49,7 +49,7 @@ if __name__ == '__main__':
     for record in records:
         fields = record.split('\r')
         for (i, v) in enumerate(fields):
-            print i, parse_data(v)
+            print(i, parse_data(v))
         e = db.new()
         e.name = parse_data(fields[0])
         e.label = parse_data(fields[1])

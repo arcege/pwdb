@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-import blowfish
+from encrypt import blowfish
 
 __version = '$Id$'
 

@@ -1,6 +1,16 @@
 #!/usr/bin/python
 
-import getopt
+try:
+    #raise ImportError
+    from argparse import ArgumentParser
+except ImportError:
+    ArgumentParser = None
+    try:
+        #raise ImportError
+        from optparse import OptionParser
+    except ImportError:
+        OptionParser = None
+        import getopt
 import os
 import sys
 from cmd import Cmd
@@ -14,7 +24,7 @@ else:
     )
 sys.path.insert(0, libdir)
 from pwdb.database import Database, EncryptDatabase, Key
-from pwdb.console import Ed, get_key, Paginator, YorN
+from pwdb.console import Console, Ed, Paginator
 
 __version = '$Id$'
 
@@ -25,24 +35,11 @@ __all__ = [
   'PwdbCmd'
 ]
 
-class Colors:
-    map = {
-        'black': 30,
-        'red': 31,
-        'green': 32,
-        'yellow': 33,
-        'blue': 34,
-        'magenta': 35,
-        'cyan': 36,
-        'white': 37,
-        'bold': 1,
-    }
-    def show(cls, color, *text):
-        return '\033[%dm%s\033[0m' % (cls.map[color], ' '.join(text))
-    show = classmethod(show)
-
 class DebugCmd(Cmd):
     prompt = 'debug> '
+    doc_leader = """\
+Database debugging.
+"""
     def __init__(self, db, *args, **kws):
         Cmd.__init__(self, *args, **kws)
         self.db = db
@@ -64,9 +61,10 @@ class DebugCmd(Cmd):
         try:
             Paginator(entries).run()
         except (EOFError, KeyboardInterrupt):
-            print
+            console.write('\n')
     def help_list(self):
-        print 'list - list entries with uids'
+        console.write('Display list, with uids.\n')
+
     def do_show(self, argstr):
         args = argstr.split()
         try:
@@ -81,20 +79,22 @@ class DebugCmd(Cmd):
         finally:
             self.db.close()
     def help_show(self):
-        print 'show #uid|name ... - display details of an uid or named entry'
+        console.write('Display entry with more detail.\n')
+
     def display_entry(self, entry):
-        print Colors.show('yellow', 'uid: #%s' % entry.uid)
-        print Colors.show('yellow', 'mtime: %s' % entry.mtime)
+        console.write('uid: #%s\n' % entry.uid, fg='yellow')
+        console.write('mtime: %s\n' % entry.mtime, fg='yellow')
         for field in ('name', 'acct', 'pswd', 'url', 'label'):
             val = getattr(entry, field)
-            print Colors.show('yellow', '%s: %s' % (entry.fieldnames[field], val))
-        print Colors.show('yellow', '%s:\t%s' % (
+            console.write('%s: %s\n' % (entry.fieldnames[field], val), fg='yellow')
+        console.write('%s:\t%s\n' % (
             entry.fieldnames['notes'], entry.notes.replace('\n', '\n\t')
-        ))
+        ), fg='yellow')
+
     def do_mtime(self, argstr):
         args = argstr.split()
         if len(args) != 2:
-            print Colors.show('red', 'mtime requires to arguments: uid mtime')
+            console.write('mtime requires to arguments: uid mtime\n', fg='red')
             return False
         uid, mtime = tuple(args)
         if uid[:1] == '#':
@@ -103,7 +103,7 @@ class DebugCmd(Cmd):
         try:
             mtime = Date(mtime)
         except ValueError:
-            print Colors.show('red', 'mtime should be YYYYDDMM.HHMMSS format')
+            console.write('mtime should be YYYYDDMM.HHMMSS format\n', fg='red')
             return False
         try:
             self.db.open()
@@ -113,16 +113,16 @@ class DebugCmd(Cmd):
                     entry = e
                     break
             else:
-                print Colors.show('red', 'uid not found')
+                console.write('uid not found\n', fg='red')
             entry.mtime = mtime
             self.db.update(True)
         finally:
             self.db.close()
     def help_mtime(self):
-        print 'mtime uid mtime - set the mtime of an entry'
+        console.write('Modify the mtime of an entry\n')
 
     def do_EOF(self, argstr):
-        print
+        console.write('\n')
         return True
     def do_return(self, args):
         return True
@@ -131,11 +131,14 @@ class DebugCmd(Cmd):
     def do_quit(self, args):
         return True
     def help_quit(self):
-        print 'quit - exit the debug section'
+        console.write('\n')
 
 class TagCmd(Cmd):
     """tag management"""
     prompt = 'tag> '
+    doc_leader = """\
+Manage unified tags across entries.
+"""
     def __init__(self, db, *args, **kws):
         Cmd.__init__(self, *args, **kws)
         self.db = db
@@ -154,9 +157,9 @@ class TagCmd(Cmd):
         if '' in tags:
             p = tags.index('')
             tags[p] = '-'
-        print '\n'.join(sorted(tags))
+        console.write('\n'.join(sorted(tags))+'\n')
     def help_list(self):
-        print 'list - display all tags'
+        console.write('Display list of tags.\n')
 
     def do_show(self, argstr):
         args = argstr.split()
@@ -169,12 +172,12 @@ class TagCmd(Cmd):
                 tagset = entry.label.split(',')
                 for arg in args:
                     if arg in tagset:
-                        print entry.name
+                        console.write(entry.name + '\n')
                         break
         finally:
             self.db.close()
     def help_show(self):
-        print 'show tag ... - display list of entries with matching tags'
+        console.write('Display entries with a specific tag.\n')
 
     def do_add(self, argstr):
         args = argstr.split()
@@ -188,15 +191,16 @@ class TagCmd(Cmd):
             for entry in self.db:
                 if entry.name in args:
                     tagset = entry.label.split(',')
-                    tagset.append(name)
-                    tagset.sort()
+                    if name not in tagset:
+                        tagset.append(name)
+                        tagset.sort()
                     entry.label = ','.join(tagset)
                     force = True
             self.db.update(force)
         finally:
             self.db.close()
     def help_add(self):
-        print 'add tag entry... - add tag to given entries'
+        console.write('Add tag to set of entries.\n')
 
     def do_delete(self, argstr):
         args = argstr.split()
@@ -214,19 +218,19 @@ class TagCmd(Cmd):
                         tagset.sort()
                         ch = True
                 if ch:
-                    print entry.name
+                    console.write(entry.name + '\n')
                     entry.label = ','.join(tagset)
                     force = True
             self.db.update(force)
         finally:
             self.db.close()
     def help_delete(self):
-        print 'delete tag ... - delete one or more tags from each entry'
+        console.write('Remove tag from set of entries.\n')
 
     def do_rename(self, argstr):
         args = argstr.split()
         if len(args) != 2:
-            print Colors.show('red', 'tag rename requires two arguments')
+            console.write('tag rename requires two arguments\n', fg='red')
             return
         oldtag, newtag = args
         if oldtag == '-':
@@ -239,7 +243,7 @@ class TagCmd(Cmd):
             for entry in self.db:
                 tagset = entry.label.split(',')
                 for i in xrange(len(tagset)):
-                    #print 'tagset[%d] = %s' % (i, repr(tagset[i]))
+                    #console.write('tagset[%d] = %s\n' % (i, repr(tagset[i])))
                     if tagset[i] == oldtag:
                         tagset[i] = newtag
                         tagset.sort()
@@ -248,37 +252,40 @@ class TagCmd(Cmd):
                 else:
                     ch = False
                 if ch:
-                    print entry.name
+                    console.write(entry.name + '\n')
                     entry.label = ','.join(tagset)
                     force = True
             self.db.update(force)
         finally:
             self.db.close()
     def help_rename(self):
-        print 'rename oldtag newtag - rename a tag in each entry'
+        console.write('Rename existing tag.\n')
 
     def do_EOF(self, args):
-        print
+        console.write('\n')
         return True
     def do_return(self, args):
         return True
     def help_return(self):
-        print 'return - exit the tag management section'
+        console.write('\n')
     def do_quit(self, args):
         return True
     def help_quit(self):
-        print 'quit - exit the tag management section'
+        console.write('\n')
 
 class PwdbCmd(Cmd):
     prompt = 'pwdb> '
     intro = '''Password Database command interpreter
 System to view and manipulate passwords and their metadata.'''
+    doc_leader = """\
+Command interpreter for securely managing account passwords.
+"""
     def __init__(self, *args, **kws):
         key = kws['key']
         del kws['key']
         Cmd.__init__(self, *args, **kws)
         self.key = key
-        #print 'key=', repr(key)
+        #console.write('key=%s\n' % repr(key))
         kls = Database.check_file_type(DB_Filename)
         self.db = kls(DB_Filename, self.key)
         self.db.open() # to force data key decryption check
@@ -298,9 +305,9 @@ System to view and manipulate passwords and their metadata.'''
         try:
             Paginator(entrynames).run()
         except (EOFError, KeyboardInterrupt):
-            print
+            console.write('\n')
     def help_list(self):
-        print 'list [name] - display a list of entries, by name'
+        console.write('Display entries by name.\n')
 
     def do_show(self, argstr):
         args = argstr.split()
@@ -311,33 +318,34 @@ System to view and manipulate passwords and their metadata.'''
                 if e:
                     self.display_entry(e)
                 else:
-                    print Colors.show('red', repr(name), 'not found')
+                    console.write(repr(name), 'not found\n', fg='red')
         finally:
             self.db.close()
     def help_show(self):
-        print 'show name... - display the details of one or more entries'
+        console.write('\n')
 
     def do_new(self, args):
         try:
             while True:
-                name  = raw_input('Entry Name: ')
+                name  = console.input('Entry Name:')
                 if ' ' in name:
-                    print Colors.show('red',
-                        'Error: spaces not allowed in entry names'
+                    console.write(
+                        'Error: spaces not allowed in entry names\n',
+                        fg='red'
                     )
                 else:
                     break
-            acct  = raw_input('Account Name: ')
-            print "Enter '!' to generate a password"
-            pswd  = raw_input('Password: ')
+            acct  = console.input('Account Name:')
+            console.write("Enter '!' to generate a password\n")
+            pswd  = console.input('Password:')
             if pswd == '!':
                 pswd = self.gen_password()
-            url   = raw_input('URL: ')
-            label = raw_input('Labels: ')
-            print 'Notes:'
+            url   = console.input('URL:')
+            label = console.input('Labels:')
+            console.write('\n')
             notes = Ed('').run()
         except (EOFError, KeyboardInterrupt):
-            print
+            console.write('\n')
         else:
             self.db.open()
             entry = self.db.new()
@@ -351,7 +359,7 @@ System to view and manipulate passwords and their metadata.'''
             self.db.update()
             self.db.close()
     def help_new(self):
-        print 'new - enter information for a new entry into the pswd database'
+        console.write('Populate a new entry.\n')
 
     def do_edit(self, argstr):
         args = argstr.split()
@@ -369,7 +377,7 @@ System to view and manipulate passwords and their metadata.'''
         finally:
             self.db.close()
     def help_edit(self):
-        print 'edit name - edit an existing entry'
+        console.write('Edit an existing entry; only modified fields are changed\n')
 
     def do_remove(self, argstr):
         args = argstr.split()
@@ -378,15 +386,15 @@ System to view and manipulate passwords and their metadata.'''
             for arg in args:
                 entry = self.db.find(arg)
                 if entry is not None:
-                    if YorN('Remove %s' % entry.name):
+                    if console.YorN('Remove %s' % entry.name):
                         del self.db[entry]
                 else:
-                    print Colors.show('red', arg, 'not found')
+                    console.write(arg, 'not found\n', fg='red')
             self.db.update()
         finally:
             self.db.close()
     def help_remove(self):
-        print 'remove name... - remove one or more entries'
+        console.write('Remove an existing entry.\n')
 
     def do_find(self, argstr):
         args = argstr.split()
@@ -398,33 +406,34 @@ System to view and manipulate passwords and their metadata.'''
         for entry in entries:
             for arg in args:
                 if arg in entry:
-                    print entry.name
+                    console.write(entry.name + '\n')
     def help_find(self):
-        print 'find name... - return list of entries with a string'
+        console.write('Display list of entries containing matching string.\n')
 
     def do_search(self, argstr):
         try:
             import re
             cmp = re.compile(argstr, re.IGNORECASE)
-        except re.error, e:
-            print Colors.show('red', str(e))
+        except re.error:
+            et, ev, es = sys.exc_info()
+            console.write(str(ev) + '\n', fg='red')
             return
         try:
             lastentry = None
             self.db.open()
             for entry in self.db:
-                for key in entry.fieldnames.keys():
+                for key in list(entry.fieldnames.keys()):
                     val = getattr(entry, key)
                     if cmp.search(val):
                         # was this entry's name printed already
                         if lastentry != entry:
-                            print entry.name
+                            console.write(entry.name + '\n')
                             lastentry = entry
-                        print '\t%s: %s' % (entry.fieldnames[key], val)
+                        console.write('\t%s: %s\n' % (entry.fieldnames[key], val))
         finally:
             self.db.close()
     def help_search(self):
-        print 'search pattern - search for a string'
+        console.write('Display matches.\n')
 
     def do_tag(self, argstr):
         args = argstr.split()
@@ -444,38 +453,38 @@ System to view and manipulate passwords and their metadata.'''
             cli.onecmd(argstr)
 
     def do_EOF(self, args):
-        print
+        console.write('\n')
         return True
     def do_quit(self, args):
         return True
     def help_quit(self):
-        print 'quit - exit the program'
+        console.write('\n')
 
     def help_help(self):
-        print 'help - show information about the commands available'
+        console.write('\n')
 
     def display_entry(self, entry):
         for field in ('name', 'acct', 'pswd', 'url', 'label'):
             val = getattr(entry, field)
-            print '%s: %s' % (entry.fieldnames[field], val)
-        print '%s:\t%s' % (
+            console.write('%s: %s\n' % (entry.fieldnames[field], val))
+        console.write('%s:\t%s\n' % (
             entry.fieldnames['notes'], entry.notes.replace('\n', '\n\t')
-        )
+        ))
 
     def edit_entry(self, entry):
         self.display_entry(entry)
-        print 'Editing...'
+        console.write('\n')
         try:
-            name  = raw_input('%s: ' % entry.fieldnames['name'])
-            acct  = raw_input('%s: ' % entry.fieldnames['acct'])
-            pswd  = raw_input('%s: ' % entry.fieldnames['pswd'])
-            url   = raw_input('%s: ' % entry.fieldnames['url'])
-            label = raw_input('%s: ' % entry.fieldnames['label'])
-            print 'Notes:'
+            name  = console.input('%s:' % entry.fieldnames['name'])
+            acct  = console.input('%s:' % entry.fieldnames['acct'])
+            pswd  = console.input('%s:' % entry.fieldnames['pswd'])
+            url   = console.input('%s:' % entry.fieldnames['url'])
+            label = console.input('%s:' % entry.fieldnames['label'])
+            console.write('\n')
             notes = Ed(entry.notes).run()
         except (EOFError, KeyboardInterrupt):
-            print
-            print Colors.show('red', 'Aborting edit')
+            console.write('\n')
+            console.write('Aborting edit\n', fg='red')
             return False
         else:
             new_name  = name  or entry.name
@@ -484,13 +493,19 @@ System to view and manipulate passwords and their metadata.'''
             new_url   = url   or entry.url
             new_label = label or entry.label
             new_notes = notes or entry.notes
-            print 'Verify...'
+            console.write('\n')
             for name, value in (
                 ('name', new_name), ('acct', new_acct), ('pswd', new_pswd),
                 ('url', new_url), ('label', new_label)):
-                print '%s: ' % entry.fieldnames[name], value
-            print 'Notes:\t%s' % new_notes
-            if YorN('Is this correct?'):
+                if getattr(entry, name) == value:
+                    console.write('%s: %s\n' % (entry.fieldnames[name], value))
+                else:
+                    console.write('%s: %s\n' % (entry.fieldnames[name], value), fg='green', attr='bold')
+            if getattr(entry, 'notes') == new_notes:
+                console.write('Notes:\t%s\n' % new_notes)
+            else:
+                console.write('Notes:\t%s\n' % new_notes, fg='green', attr='bold')
+            if console.YorN('Is this correct?'):
                 entry.name  = new_name
                 entry.acct  = new_acct
                 entry.pswd  = new_pswd
@@ -505,31 +520,31 @@ System to view and manipulate passwords and their metadata.'''
         password = ''
         done = False
         while not done:
-            length = raw_input('Length? [10] ')
+            length = console.input('Length? [10]')
             try:
                 if length != '' and int(length) <= 6:
-                    print Colors.show('red', 'must be greater than 6 characters')
+                    console.write('must be greater than 6 characters\n', fg='red')
                 else:
                     done = True
             except ValueError:
                 pass
         if not length:
             length = '10'
-        symbols = YorN('Symbols?', reqresp=False, allowintr=True)
-        cmd = 'newpasswd --quiet --number=%s' % length
+        symbols = console.YorN('Symbols?', reqresp=False, allowintr=True)
+        cmd = 'newpasswd --number=%s' % length
         if symbols:
-            cmd = cmd + ' --symbols'
+            cmd = cmd + ' --strong'
         cmd += ' 2>/dev/null'
         while True:
             f = os.popen(cmd, 'r')
             line = f.readline()
             rc = f.close()
             if rc:
-                print Colors.show('red', 'Error generating new password')
+                console.write('Error generating new password\n', fg='red')
                 raise KeyboardInterrupt  # caught in the caller
             (strength, password) = line.rstrip().split('\t', 1)
-            print line.rstrip()
-            if YorN('Is this acceptable?', allowintr=True):
+            console.write(line.rstrip() + '\n')
+            if console.YorN('Is this acceptable?', allowintr=True):
                 break
         return password
 
@@ -540,34 +555,59 @@ def profile_main(key):
     global Profile_fname
     profile.runctx("real_main(key)", globals(), locals(), Profile_fname)
 
+console = None
+
 if __name__ == '__main__':
-    try:
-        opts, args = getopt.getopt(sys.argv[1:], 'f:h',
-                                    ['file=', 'help'])
-    except getopt.error, e:
-        raise SystemExit(e)
-    for opt, val in opts:
-        if opt == '--':
-            break
-        elif opt in ('-h', '--help'):
-            print sys.argv[0], '[opts]'
-            print '  -h|--help'
-            print '  -f|--file=dbfile'
-            raise SystemExit
-        elif opt in ('-f', '--file'):
-            DB_Filename = val
+    if ArgumentParser:
+        #console.write('\n')
+        parser = ArgumentParser()
+        parser.add_argument('-f', '--file', dest='filename',
+                            help="different database file",
+                            metavar="dbfile")
+        args = parser.parse_args()
+        if args.filename:
+            DB_Filename = args.filename
+    elif OptionParser:
+        #console.write('\n')
+        parser = OptionParser()
+        parser.add_option('-f', '--file', dest='filename',
+                          help="different database file",
+                          metavar="dbfile")
+        (opts, args) = parser.parse_args()
+        if opts.filename:
+            DB_Filename = opts.filename
+    else:
+        #console.write('\n')
+        try:
+            opts, args = getopt.getopt(sys.argv[1:], 'f:h',
+                                        ['file=', 'help'])
+        except getopt.error:
+            et, ev, es = sys.exc_info()
+            raise SystemExit(ev)
+        for opt, val in opts:
+            if opt == '--':
+                break
+            elif opt in ('-h', '--help'):
+                console.write('% [opts]\n' % sys.argv[0])
+                console.write('  -h|--help\n')
+                console.write('  -f|--file=dbfile\n')
+                raise SystemExit
+            elif opt in ('-f', '--file'):
+                DB_Filename = val
+
+    console = Console()
 
     kls = Database.check_file_type(DB_Filename)
     if kls == EncryptDatabase:
         try:
-            key = Key(get_key('Key'))
+            key = Key(console.get_key('Key'))
         except (KeyboardInterrupt, EOFError):
-            #print
+            #console.write('\n')
             raise SystemExit
     else:
         key = None
 
-    if os.environ.has_key('PROFILING'):
+    if 'PROFILING' in os.environ:
         if os.environ['PROFILING']:
             Profile_fname = os.environ['PROFILING']
         else:
@@ -585,12 +625,14 @@ if __name__ == '__main__':
     try:
         try:
             mainfunc(key)
-        except ValueError, msg:
-            raise SystemExit(msg)
-        except RuntimeError, msg:
-            raise SystemExit(msg)
+        #except ValueError:
+        #    et, ev, es = sys.exc_info()
+        #    raise SystemExit(ev)
+        #except RuntimeError:
+        #    et, ev, es = sys.exc_info()
+        #    raise SystemExit(ev)
         except KeyboardInterrupt:
-            print
+            console.write('\n')
     finally:
         os.system('clear')
 

@@ -3,7 +3,19 @@
 try:
     from hashlib import md5
 except ImportError:
-    import md5.new as md5
+    try:
+        import md5.new as md5
+    except ImportError:
+        from md5 import md5
+
+try:
+    bytes
+except NameError:
+    bytes = lambda s, e=None: str(s)
+else:
+    # the python 3.x 'bytes' requires an encoding argument
+    if bytes == str:
+        bytes = lambda s, e=None: str(s)
 
 __version = '$Id$'
 
@@ -16,15 +28,15 @@ class Key(str):
     size = 56
     def __new__(cls, keystring):
         if isinstance(keystring, Key):
-            key    = str(keystring)
+            key    = bytes(str(keystring), 'utf-8')
         else:
-            md5obj = md5(str(keystring))
+            md5obj = md5(bytes(keystring, 'utf-8'))
             root = md5obj.hexdigest()
             dig = root
             n, r = divmod(len(dig), cls.size)
             while n != 1 and r != 0:
                 if n < 1:
-                    dig = root * ((cls.size/len(root))+1)
+                    dig = root * ((cls.size//len(root))+1)
                 dig = dig[:cls.size]
                 n, r = divmod(len(dig), cls.size)
             assert len(dig) == cls.size, "Could not generate correct key size"
@@ -419,6 +431,6 @@ if __name__ == '__main__':
    plaintext = ('%-8s' % 'hello').replace(' ', '\0')
    f = bfkey.encrypt(plaintext)
    g = bfkey.decrypt(f)
-   print repr(plaintext), repr(f), repr(g)
+   print(repr(plaintext), repr(f), repr(g))
    assert plaintext == g, "Count not encrypt/decrypt short string properly"
 
