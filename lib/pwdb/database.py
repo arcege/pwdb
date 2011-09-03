@@ -1,17 +1,52 @@
 #!/usr/bin/python
 
-import lock
+try:
+    import pwdb.lock as lock
+except ImportError:
+    from pwdb import lock
+#from . import lock
 import os
 import gzip
 
+try:
+    bytes
+except NameError:
+    bytes = lambda s, e=None: str(s)
+else:
+    # the python 3.x 'bytes' requires an encoding argument
+    if bytes == str:
+        bytes = lambda s, e=None: str(s)
+try:
+    long
+except NameError:
+    long = int
+
 from encrypt.blowfish import Blowfish, Key
+
+__version = '$Id'
+
+default_encoding = 'iso-8859-1'
 
 __all__ = [
     'Database',
     'Key',
 ]
 
-DATABASE_FILE_ID = 'PDWD00'
+DATABASE_FILE_ID = 'PDWD00'.encode(default_encoding)
+
+class ComparableMixin:
+    def __eq__(self, other):
+        raise NotImplementedError("Equality not implemented")
+    def __lt__(self, other):
+        raise NotImplementedError("Less than not implemented")
+    def __ne__(self, other):
+        return not self.__eq__(other)
+    def __gt__(self, other):
+        return not (self._eq__(other) or self.__lt__(other))
+    def __ge__(self, other):
+        return self.__eq__(other) or self.__gt__(other)
+    def __le__(self, other):
+        return self.__eq__(other) or self.__lt__(other)
 
 class UID(long):
     def __new__(cls, val):
@@ -19,10 +54,12 @@ class UID(long):
         return obj
     def __repr__(self):
         return '<%s %d>' % (self.__class__.__name__, self)
+    def __next__(self):
+        return self.next()
     def next(self):
-        return str(self + 1)
+        return self.__class__(self + 1)
 
-class Entry:
+class Entry(ComparableMixin):
     fieldnames = {
         'name': 'Name',
         'acct': 'Account',
@@ -64,18 +101,23 @@ class Entry:
             self.notes.find(key) != -1 or
             self.url.find(key) != -1
         )
-    def __cmp__(self, other):
-        if isinstance(other, Entry):
-            return cmp(self.uid, other.uid)
+    def __eq__(self, other):
+        if hasattr(other, 'uid'):
+            return self.uid == other.uid
         else:
-            return -cmp(other, self.name)
+            return self.name == other
+    def __lt__(self, other):
+        if hasattr(other, 'uid'):
+            return self.uid<other.uid
+        else:
+            return self.name<other
     def __str__(self):
         return str(self.name)
     def __repr__(self):
         return '<%s "%s">' % (self.__class__.__name__, self.name)
 
-class Date:
-    fmtpatt = '%Y%d%m.%H%M%S'
+class Date(ComparableMixin):
+    fmtpatt = '%Y%m%d.%H%M%S'
     def __init__(self, datestr):
         if datestr is None:
             self.when = self._now()
@@ -103,20 +145,23 @@ class Date:
     def __repr__(self):
         import time
         return '<%s "%s">'% (self.__class__.__name__, time.asctime(self.when))
-    def __cmp__(self, other):
-        import time
-        return -cmp(other, long(self))
+    def __hash__(self):
+        return long(other)
+    def __eq__(self, other):
+        return long(self)==other
+    def __lt__(self, other):
+        return long(self)<other
 
-class Database:
+class Database(object):
     Locked = lock.FileLock.Locked
-    rec_delim = ('--' * 38)
-    header = 'PWDB\n'
+    rec_delim = ('--' * 38).encode(default_encoding)
+    header = 'PWDB\n'.encode(default_encoding)
     def __init__(self, filename):
+        self.dirty = False
         self.filename = filename
         self.flock = lock.FileLock(filename)
         self.file = None
         self.uid = None
-        self.dirty = False
         self.mtime = 0
         self.cache = {}
     def __del__(self):
@@ -132,7 +177,7 @@ class Database:
             self.flock.lock()
             try:
                 self._open()
-            except IOError, e:
+            except IOError:
                 self.flock.unlock()
                 raise
     def _open(self):
@@ -167,7 +212,7 @@ class Database:
                     self.cache[entry.uid] = entry
                     counts['entries'] += 1
                     entry = self._read_next(counts)
-            except AttributeError, e:
+            except AttributeError:
                 raise ValueError(
                     'invalid database entry#%d, line %d' %
                         (counts['entries'], counts['lines'])
@@ -218,9 +263,9 @@ class Database:
     def find(self, name):
         if self.need_refresh():
             self.refresh()
-        if self.cache.has_key(name):
+        if name in self.cache:
             return self.cache[name]
-        values = self.values()
+        values = list(self.values())
         try:
             p = values.index(str(name))
         except ValueError:
@@ -261,7 +306,7 @@ class Database:
         self.uid = UID(value)
     def gen_uid(self):
         self.open()
-        uid = self.uid.next()
+        uid = next(self.uid)
         self.dirty = True
         return uid
 
@@ -272,7 +317,7 @@ class Database:
         else:
             return False
     def __iter__(self):
-        for entry in self.values():
+        for entry in list(self.values()):
             yield entry
 
     def _read_next(self, counts):
@@ -297,7 +342,7 @@ class Database:
                 line = self.file.readline()
                 counts['lines'] += 1
         except ValueError:
-            raise AttributeError(count, 'invalid data entry')
+            raise AttributeError(counts, 'invalid data entry')
         e = Entry(self,
             e['name'], e['label'], e['url'], e['acct'], e['pswd'],
             e['notes'].replace('###', '\n'),
@@ -313,7 +358,7 @@ class Database:
             return
         tmpfname = '%s.tmp.%d' % (self.filename, os.getpid())
         # make sure that the creation of the file is owner-readable only
-        oldmask = os.umask(0077)
+        oldmask = os.umask(0x3f) # octal 0077
         file = self._get_writer(tmpfname)
         file.write('%ld\n' % self.uid)
         for entry in self:
@@ -349,17 +394,19 @@ class Database:
         file = open(filename, 'rb')
         sl = max([len(s) for s in table])
         s = file.read(sl)
+        #print(type(s), repr(s))
         if not s: # empty file
             return GzipDatabase
         for sb in table:
-            if s[:len(sb)] == sb:
+            #print('\t' + repr(type(sb)), repr(sb))
+            if bytes(s[:len(sb)]) == sb:
                 return table[sb]
         else:
             raise ValueError('cannot determine file type')
     check_file_type = staticmethod(check_file_type)
 
 class GzipDatabase(Database):
-    startbytes = '\037\213'
+    startbytes = bytes('\x1f\x8b', 'utf-8')
     need_key = False
     def __init__(self, filename, key):
         Database.__init__(self, filename)
@@ -371,12 +418,12 @@ class GzipDatabase(Database):
         return gzip.GzipFile('w', fileobj=open(filename, 'w'))
 
 class EncryptDatabase(Database):
-    startbytes = DATABASE_FILE_ID
+    startbytes = bytes(DATABASE_FILE_ID)
     need_key = True
     def __init__(self, filename, key):
+        Database.__init__(self, filename)
         self.key = Key(key)
         self.encrypter = Blowfish(self.key)
-        Database.__init__(self, filename)
     def initialize(self):
         f = Encoder(self.filename, self.encrypter)
         f.open()
@@ -390,8 +437,9 @@ class EncryptDatabase(Database):
         return file
 
 class Engine:
-    sentinal = 'ENCODED\n'  # used to determine if the correct key was used
-                            # to decrypt the file
+    sentinal = bytes('ENCODED\n', 'utf-8')
+    # used to determine if the correct key was used
+    # to decrypt the file
     def __init__(self, filename, encrypter):
         self.name = filename
         self.fp = None
@@ -404,9 +452,12 @@ class Engine:
         return '<%s "%s">' % (self.__class__.__name__, self.name)
     def open(self):
         try:
-            from cStringIO import StringIO
+            from ioXXX import StringIO
         except ImportError:
-            from StringIO import StringIO
+            try:
+                from cStringIO import StringIO
+            except ImportError:
+                from StringIO import StringIO
         self.fp = StringIO()
         self._sfp = open(self.name, self._filemode)
         self.mode = self._filemode.replace("b", "")
@@ -443,7 +494,7 @@ class Decoder(Engine):
         blk = self._sfp.read(bs)
         while blk:
             dblk = self.encrypter.decrypt(blk).rstrip('\0')
-            self.fp.write(dblk)
+            self.fp.write(str(dblk))
             blk = self._sfp.read(bs)
         self.fp.seek(0)
 
@@ -465,11 +516,10 @@ class Encoder(Engine):
         blk = self.fp.read(bs)
         while blk:
             if len(blk) < bs:
-                s = '\0' * (bs-len(blk))
+                s = '\0'.encode('ascii') * (bs-len(blk))
                 blk += s
             dblk = self.encrypter.encrypt(blk)
             self._sfp.write(dblk)
             blk = self.fp.read(bs)
         self._sfp.flush()
-
 

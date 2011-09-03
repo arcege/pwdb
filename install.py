@@ -5,6 +5,8 @@ import getopt
 import os
 import sys
 
+__version = '$Id$'
+
 install_dir = '~'
 #install_dir = '/tmp/foo'
 
