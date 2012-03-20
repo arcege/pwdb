@@ -2,7 +2,7 @@
 
 import os
 
-__version = '$Id'
+__version = '$Id$'
 
 __all__ = [
   'FileLock',
@@ -24,6 +24,11 @@ class FileLock:
         return os.path.exists(self.lckname)
     def __bool__(self):
         return os.path.exists(self.lckname)
+    # for context managers
+    def __enter__(self):
+        self.lock()
+    def __exit__(self, etype, evalue, etraceback):
+        self.unlock()
     def lock(self):
         if self:
             raise self.Locked(self.name)
