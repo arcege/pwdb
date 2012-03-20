@@ -39,6 +39,8 @@ class Console(object):
             'cyan': 6,
             'white': 7,
         }
+
+        @classmethod
         def show(cls, *text, **kwargs):
             bold = fg = bg = ''
             try:
@@ -75,7 +77,6 @@ class Console(object):
                     return s + b + txt + e
             except KeyError:
                 raise ValueError('no such color: %s' % color)
-        show = classmethod(show)
     show = Colors.show
 
     def __init__(self, stdin=None, stdout=None, encoding=None):
@@ -288,6 +289,8 @@ class Paginator(object):
         ch = os.read(self.infd, 1)
         os.write(self.outfd, bytes('\r     \r', 'utf-8'))
         return ch
+
+    @classmethod
     def get_lines(cls):
         try:
             return cls.lines
@@ -300,5 +303,4 @@ class Paginator(object):
                 cls.lines = int(r)
                 f.close()
             return cls.lines
-    get_lines = classmethod(get_lines)
 

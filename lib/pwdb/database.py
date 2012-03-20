@@ -123,13 +123,13 @@ class Date(ComparableMixin):
             self.when = self._now()
         else:
             self.when = self.parse(datestr)
+    @staticmethod
     def _now():
         import time
         return time.gmtime()
-    _now = staticmethod(_now)
+    @classmethod
     def now(cls):
         return cls(None)
-    now = classmethod(now)
     def parse(cls, datestr):
         import time
         return time.strptime(datestr, cls.fmtpatt)
@@ -374,6 +374,7 @@ class Database(object):
         os.rename(tmpfname, self.filename)
         self._reopen()
 
+    @classmethod
     def write_entry(cls, file, entry):
         file.write('name: %s\n' % entry.name)
         file.write('label: %s\n' % entry.label)
@@ -384,8 +385,8 @@ class Database(object):
         file.write('mtime: %s\n' % entry.mtime)
         file.write('uid: %ld\n' % entry.uid)
         file.write('%s\n' % cls.rec_delim)
-    write_entry = classmethod(write_entry)
 
+    @staticmethod
     def check_file_type(filename):
         table = {
             GzipDatabase.startbytes: GzipDatabase,
@@ -403,7 +404,6 @@ class Database(object):
                 return table[sb]
         else:
             raise ValueError('cannot determine file type')
-    check_file_type = staticmethod(check_file_type)
 
 class GzipDatabase(Database):
     startbytes = bytes('\x1f\x8b', 'utf-8')

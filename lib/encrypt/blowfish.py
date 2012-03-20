@@ -1,5 +1,8 @@
 #!/usr/bin/python
 
+from types import InstanceType
+from decorators import accepts, returns
+
 try:
     from hashlib import md5
 except ImportError:
@@ -398,6 +401,8 @@ class Blowfish:
             r ^= self.p[0]
         return (r, l)
 
+    @accepts(InstanceType, str)
+    @returns(str)
     def encrypt(self, block):
         parts = [ord(b) for b in str(block)]
         l = parts[3] | (parts[2] << 8) | (parts[1] << 16) | (parts[0] << 24)
@@ -409,6 +414,8 @@ class Blowfish:
         )
         return "".join([chr(b & 0xFF) for b in p])
 
+    @accepts(InstanceType, str)
+    @returns(str)
     def decrypt(self, block):
         parts = [ord(b) for b in str(block)]
         l = parts[3] | (parts[2] << 8) | (parts[1] << 16) | (parts[0] << 24)
@@ -422,7 +429,7 @@ class Blowfish:
 
 if __name__ == '__main__':
 
-   bfkey = Blowfish('0123456678901234567890123456789012345678912345')
+   bfkey = Blowfish('01234566789012345678901234567890123456789123456789012345')
    plaintext = 'hello world'[:8]
    f = bfkey.encrypt(plaintext)
    g = bfkey.decrypt(f)
